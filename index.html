@@ -41,20 +41,21 @@
       font-size: 1em;
       margin-right: 1.2em;
     }
-    #metaScoreLabel {
+    #metaScoreLabel, #metaPrefLabel {
       font-size: 0.97em;
       font-weight: bold;
       user-select: none;
       cursor: pointer;
       display: flex;
       align-items: center;
+      margin-right: 1.3em;
     }
-    #metaScore {
+    #metaScore, #metaPref {
       vertical-align: middle;
       margin-right: 0.4em;
       accent-color: #228be6;
     }
-    #metaScoreExplain {
+    #metaScoreExplain, #metaPrefExplain {
       font-size: 0.93em;
       color: #234;
       margin-top: 0.18em;
@@ -191,7 +192,7 @@
       #timerBox { font-size: 1em; gap: 0.7em; }
       #timerToggleLabel { font-size: 1em; }
       #fixedNextBtn { margin-bottom: 2em; }
-      #metaScoreExplain { font-size: 0.88em; padding-left: 0.3em; }
+      #metaScoreExplain, #metaPrefExplain { font-size: 0.88em; padding-left: 0.3em; }
     }
   </style>
 </head>
@@ -223,11 +224,19 @@
           <input type="checkbox" id="metaScore" />
           Only Score &gt; 80
         </label>
+        <label id="metaPrefLabel" title="Only use preferred movesets for each Pokémon (from PvPoke meta)">
+          <input type="checkbox" id="metaPref" />
+          Preferred moveset only
+        </label>
       </div>
       <div id="metaScoreExplain">
         <b>What does "Score &gt; 80" mean?</b><br>
         This limits the Pokémon pool to only those with an <b>overall score above 80 in the selected meta on <a href="https://pvpoke.com" target="_blank" rel="noopener">pvpoke.com</a></b>.<br>
         Higher overall score means the Pokémon is more competitively viable in that meta.
+      </div>
+      <div id="metaPrefExplain">
+        <b>What does "Preferred moveset only" mean?</b><br>
+        This only asks about the best/most recommended movesets for each Pokémon, as listed in the selected meta's CSV (columns <b>Fast Move</b>, <b>Charged Move 1</b> and <b>Charged Move 2</b>).
       </div>
       <div id="metaWarn" style="color:#b00;font-size:0.98em;padding:0.1em 0 0.2em 0;"></div>
       <div style="font-size:0.9em;color:#888;margin-top:0.2em;">
@@ -264,7 +273,6 @@
   <div id="fixedNextWrap">
     <span id="fixedNextBtnWrap">
       <button id="fixedNextBtn" type="button">Next Question</button>
-      <!-- The close button is removed to make the Next Question button uncloseable -->
     </span>
   </div>
   <script>
@@ -287,8 +295,10 @@
     const metaRootURL = `https://raw.githubusercontent.com/${githubUser}/${githubRepo}/main/rankings/`;
 
     let metaPokes = [];
+    let metaPreferred = {}; // { [Pokemon Name]: { fast: ..., charge1: ..., charge2: ... }, ... }
     let currentMeta = localStorage.getItem("quizMeta") || metaCSVFILES[0].file;
     let onlyHighScore = localStorage.getItem("onlyHighScore") === "true";
+    let onlyPreferredMoveset = localStorage.getItem("onlyPreferredMoveset") === "true";
 
     function populateMetaMenu() {
       const metaSelect = document.getElementById('metaSelect');
@@ -301,6 +311,7 @@
       });
       metaSelect.value = currentMeta;
       document.getElementById('metaScore').checked = onlyHighScore;
+      document.getElementById('metaPref').checked = onlyPreferredMoveset;
       loadMetaAndApply();
     }
     document.getElementById('metaSelect').onchange = function() {
@@ -313,8 +324,15 @@
       localStorage.setItem("onlyHighScore", onlyHighScore);
       loadMetaAndApply();
     };
+    document.getElementById('metaPref').onchange = function() {
+      onlyPreferredMoveset = this.checked;
+      localStorage.setItem("onlyPreferredMoveset", onlyPreferredMoveset);
+      loadMetaAndApply();
+    };
+
     function loadMetaAndApply() {
       document.getElementById('metaWarn').textContent = "";
+      metaPreferred = {};
       if (!currentMeta) { metaPokes = []; return; }
       fetch(metaRootURL + encodeURIComponent(currentMeta))
         .then(r => r.text())
@@ -328,21 +346,38 @@
           const head = lines[0].split(",");
           const idxName = head.findIndex(h => h.trim().toLowerCase() === "pokemon");
           const idxScore = head.findIndex(h => h.trim().toLowerCase() === "score");
+          const idxFM = head.findIndex(h => h.trim().toLowerCase() === "fast move");
+          const idxC1 = head.findIndex(h => h.trim().toLowerCase() === "charged move 1");
+          const idxC2 = head.findIndex(h => h.trim().toLowerCase() === "charged move 2");
           if (idxName === -1 || idxScore === -1) {
             metaPokes = [];
             document.getElementById('metaWarn').textContent = "Meta CSV missing Pokemon or Score column.";
             return;
           }
-          metaPokes = lines.slice(1)
-            .map(l => l.split(","))
-            .filter(row => !onlyHighScore || (parseFloat(row[idxScore]) > 80))
-            .map(row => row[idxName]);
+          metaPokes = [];
+          metaPreferred = {};
+          lines.slice(1).forEach(rowstr => {
+            const row = rowstr.split(",");
+            const name = row[idxName];
+            const score = parseFloat(row[idxScore]);
+            if (!onlyHighScore || score > 80) {
+              metaPokes.push(name);
+            }
+            if (idxFM !== -1 && idxC1 !== -1 && idxC2 !== -1) {
+              metaPreferred[name] = {
+                fast: row[idxFM],
+                charge1: row[idxC1],
+                charge2: row[idxC2]
+              };
+            }
+          });
           if (!metaPokes.length) {
             document.getElementById('metaWarn').textContent = "No Pokémon with Score > 80 in this meta.";
           }
           newQuestion();
         });
     }
+
     // Timer and stats logic (unchanged)
     let stats = JSON.parse(localStorage.getItem('quizStats') ||
       '{"total":0,"correct":0,"sumTime":0,"sumTimeRight":0,"rightCount":0}');
@@ -530,15 +565,43 @@
         return obj;
       });
     }
+
     function pickEligiblePokemon() {
       let eligible = pokedex.filter(poke => {
-        let fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
-        let chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
-        return fastList.length && chargeList.length && (!metaPokes.length || metaPokes.includes(poke.speciesName));
+        let name = poke.speciesName;
+        let fastList, chargeList;
+        if (onlyPreferredMoveset && metaPreferred[name]) {
+          fastList = [metaPreferred[name].fast].filter(mv => !!movesByName[mv]);
+          chargeList = [metaPreferred[name].charge1, metaPreferred[name].charge2].filter(mv => !!movesByName[mv]);
+        } else {
+          fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
+          chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
+        }
+        return fastList.length && chargeList.length && (!metaPokes.length || metaPokes.includes(name));
       });
       if (!eligible.length) return null;
       return eligible[Math.floor(Math.random() * eligible.length)];
     }
+
+    function getPreferredOrAllFastMoves(poke) {
+      let name = poke.speciesName;
+      if (onlyPreferredMoveset && metaPreferred[name]) {
+        let fm = metaPreferred[name].fast;
+        return [fm].filter(mv => !!movesByName[mv]);
+      }
+      return (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
+    }
+    function getPreferredOrAllChargeMoves(poke) {
+      let name = poke.speciesName;
+      if (onlyPreferredMoveset && metaPreferred[name]) {
+        let c1 = metaPreferred[name].charge1;
+        let c2 = metaPreferred[name].charge2;
+        // Remove duplicates and blanks
+        return [c1, c2].filter((mv, i, arr) => mv && arr.indexOf(mv) === i && !!movesByName[mv]);
+      }
+      return (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
+    }
+
     function calcFastMovesForNthCharge(fastEnergy, chargeEnergy, n) {
       let energy = 0;
       let fastsToEachCharge = [];
@@ -572,8 +635,8 @@
           document.getElementById('answerForm').classList.add('hidden');
           return;
         }
-        let fastList = (pokemon.fastMoves || []).filter(mv => !!movesByName[mv]);
-        let chargeList = (pokemon.chargedMoves || []).filter(mv => !!movesByName[mv]);
+        let fastList = getPreferredOrAllFastMoves(pokemon);
+        let chargeList = getPreferredOrAllChargeMoves(pokemon);
         let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
         let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
         let which = 1; // Always 1st
@@ -589,18 +652,25 @@
       if (difficulty === "combo") {
         if (Math.random() < 1/3) {
           let eligible = pokedex.filter(poke => {
-            let fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
-            let chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
-            return fastList.length && chargeList.length >= 2 && (!metaPokes.length || metaPokes.includes(poke.speciesName));
+            let name = poke.speciesName;
+            let fastList, chargeList;
+            if (onlyPreferredMoveset && metaPreferred[name]) {
+              fastList = [metaPreferred[name].fast].filter(mv => !!movesByName[mv]);
+              chargeList = [metaPreferred[name].charge1, metaPreferred[name].charge2].filter(mv => !!movesByName[mv]);
+            } else {
+              fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
+              chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
+            }
+            return fastList.length && chargeList.length >= 2 && (!metaPokes.length || metaPokes.includes(name));
           });
           if (!eligible.length) return newQuestion();
           let pokemon = eligible[Math.floor(Math.random() * eligible.length)];
-          let fastList = (pokemon.fastMoves || []).filter(mv => !!movesByName[mv]);
-          let chargeList = (pokemon.chargedMoves || []).filter(mv => !!movesByName[mv]);
-          let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+          let fastList = getPreferredOrAllFastMoves(pokemon);
+          let chargeList = getPreferredOrAllChargeMoves(pokemon);
           let chargeAIdx = Math.floor(Math.random() * chargeList.length);
           let chargeBIdx;
           do { chargeBIdx = Math.floor(Math.random() * chargeList.length); } while (chargeBIdx === chargeAIdx);
+          let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
           let chargeA = movesByName[chargeList[chargeAIdx]];
           let chargeB = movesByName[chargeList[chargeBIdx]];
           let nA = 1 + Math.floor(Math.random() * 3); // 1-3 times
@@ -635,8 +705,8 @@
             document.getElementById('answerForm').classList.add('hidden');
             return;
           }
-          let fastList = (pokemon.fastMoves || []).filter(mv => !!movesByName[mv]);
-          let chargeList = (pokemon.chargedMoves || []).filter(mv => !!movesByName[mv]);
+          let fastList = getPreferredOrAllFastMoves(pokemon);
+          let chargeList = getPreferredOrAllChargeMoves(pokemon);
           let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
           let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
           let which = 1 + Math.floor(Math.random() * 4); // 1~4
@@ -656,8 +726,8 @@
         document.getElementById('answerForm').classList.add('hidden');
         return;
       }
-      let fastList = (pokemon.fastMoves || []).filter(mv => !!movesByName[mv]);
-      let chargeList = (pokemon.chargedMoves || []).filter(mv => !!movesByName[mv]);
+      let fastList = getPreferredOrAllFastMoves(pokemon);
+      let chargeList = getPreferredOrAllChargeMoves(pokemon);
       let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
       let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
       let which = 1 + Math.floor(Math.random() * 4); // 1~4
