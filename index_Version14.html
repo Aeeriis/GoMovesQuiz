@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pokémon Go Moveset Quiz</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #fafaff; }
+    .container { max-width: 480px; margin: auto; padding: 1em; }
+    h1 { font-size: 1.6em; }
+    ol { padding-left: 1.3em; }
+    .quiz-section { margin-top: 2em; }
+    .result { margin-top: 1em; font-weight: bold; }
+    input[type="number"] { width: 90%; font-size: 1.2em; }
+    button { font-size: 1.1em; padding: 0.6em 1.2em; margin-top: 1em;}
+    label { font-size: 1.1em; }
+    #question { font-size: 1.15em; margin-bottom: 1em; }
+    #stats { font-size: 1.1em; margin: 0.8em 0; }
+    #difficultySelect { font-size: 1em; margin-bottom: 1em;}
+    #difficultyWrap { margin-bottom: 1em; }
+    #intro-explanation { margin: 1.1em 0 0.7em 0; background: #f0f7ff; border-radius: 8px; padding: 0.8em; font-size: 1.07em; color: #234; }
+    @media (max-width: 600px) {
+      h1 { font-size: 1.2em; }
+      .container { padding: 0.5em; }
+      #intro-explanation { font-size: 0.97em; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Pokémon Go Moveset Energy Quiz</h1>
+    <div id="intro-explanation">
+      <b>How the quiz works:</b><br>
+      <ul>
+        <li><b>Basic</b> – "How many fast moves do you need for the <u>first</u> charged move?"</li>
+        <li><b>Multi-Charge</b> – "How many fast moves do you need for the <u>1st, 2nd, 3rd, or 4th</u> charged move?"</li>
+        <li><b>Combo</b> – "After using a certain number of one charged move, how many fast moves are needed for a different charged move?"</li>
+      </ul>
+      After each answer, an explanation with energy breakdown is shown to help you learn!
+    </div>
+    <ol>
+      <li>Guess how many Fast Attacks are needed to use the 1st, 2nd, 3rd, or 4th Charged Move for a random Pokémon!</li>
+      <li>Sometimes, after throwing several of one charged move, you'll be asked how many fast moves are needed for a different charged move!</li>
+    </ol>
+    <div id="difficultyWrap">
+      <label for="difficultySelect"><b>Difficulty:</b></label>
+      <select id="difficultySelect">
+        <option value="basic">Basic</option>
+        <option value="multi" selected>Multi-Charge</option>
+        <option value="combo">Combo</option>
+      </select>
+    </div>
+    <div id="stats"></div>
+    <div id="loading">Loading data...</div>
+    <div class="quiz-section hidden" id="quizSection">
+      <div id="question"></div>
+      <form id="answerForm">
+        <label for="userAnswer">Your answer:</label>
+        <input type="number" id="userAnswer" min="1" required autocomplete="off" />
+        <button type="submit">Check</button>
+      </form>
+      <div class="result" id="result"></div>
+      <button id="nextQuestion" class="hidden">Next Question</button>
+      <button id="resetStats" style="margin-top:1em;">Reset Stats</button>
+    </div>
+  </div>
+  <script>
+    // Stats logic (localStorage)
+    let stats = JSON.parse(localStorage.getItem('quizStats') || '{"total":0,"correct":0}');
+    function saveStats() {
+      localStorage.setItem('quizStats', JSON.stringify(stats));
+    }
+    function showStats() {
+      document.getElementById('stats').textContent =
+        `Score: ${stats.correct}/${stats.total} (${stats.total ? Math.round(100 * stats.correct / stats.total) : 0}%)`;
+    }
+    showStats();
+
+    // Difficulty logic
+    let difficulty = "multi";
+    document.getElementById('difficultySelect').value = difficulty;
+    document.getElementById('difficultySelect').onchange = function() {
+      difficulty = this.value;
+      localStorage.setItem("quizDifficulty", difficulty);
+      newQuestion();
+    };
+
+    document.getElementById('resetStats').onclick = function() {
+      stats = { total: 0, correct: 0 };
+      saveStats();
+      showStats();
+    };
+
+    // Helper: get ordinal text for numbers
+    function getOrdinalText(n) {
+      return ["1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th"][n-1] || (n+"th");
+    }
+
+    // Explanation function
+    function getExplanation(pair) {
+      let fastName = pair.fast.Move;
+      let fastEnergy = pair.fast.Energy;
+      if (pair.isCombo) {
+        let chargeA = pair.combo.chargeA, nA = pair.combo.nA, chargeB = pair.charge;
+        // Simulate sequence for breakdown
+        let explanation =
+          `Each <b>${fastName}</b> (Fast) gives <b>${fastEnergy}</b> energy.<br>` +
+          `First, ${nA} <b>${chargeA.Move}</b> (Charged) are used. Each costs <b>${chargeA.Energy}</b> energy.<br>`;
+        let log = [];
+        let energy = 0, totalFasts = 0;
+        for (let i=1; i<=nA; ++i) {
+          let thisFasts = 0, startEnergy = energy;
+          let movesSoFar = [];
+          while (energy < chargeA.Energy) {
+            energy += fastEnergy;
+            totalFasts++;
+            thisFasts++;
+            movesSoFar.push(startEnergy + thisFasts * fastEnergy);
+          }
+          log.push(`For the ${getOrdinalText(i)} ${chargeA.Move}:<br>` +
+            `&nbsp;&nbsp;Start with <b>${startEnergy}</b> energy.<br>` +
+            `&nbsp;&nbsp;Each fast attack gives <b>${fastEnergy}</b> energy: <b>${movesSoFar.join(', ')}</b>.<br>` +
+            `&nbsp;&nbsp;After ${thisFasts} fast attacks you have <b>${startEnergy + thisFasts * fastEnergy}</b> energy (≥ ${chargeA.Energy} needed).<br>` +
+            `&nbsp;&nbsp;You spend ${chargeA.Energy} for the charged move, leaving <b>${startEnergy + thisFasts*fastEnergy - chargeA.Energy}</b> energy for the next.<br>`
+          );
+          energy -= chargeA.Energy;
+        }
+        let beforeB = energy;
+        let fastsForB = 0, breakdownB = [];
+        let energyB = beforeB;
+        while (energyB < chargeB.Energy) {
+          energyB += fastEnergy;
+          fastsForB++;
+          breakdownB.push(beforeB + fastsForB * fastEnergy);
+        }
+        explanation += log.join('<br>') + `<br>After those, you have <b>${beforeB}</b> energy.<br>`;
+        explanation += `Each fast attack gives <b>${fastEnergy}</b> energy: <b>${breakdownB.join(', ')}</b>.<br>`;
+        explanation += `After ${fastsForB} fast attacks you have <b>${beforeB + fastsForB*fastEnergy}</b> energy (≥ ${chargeB.Energy} needed).<br>`;
+        explanation += `You spend ${chargeB.Energy} for the charged move, leaving <b>${beforeB + fastsForB*fastEnergy - chargeB.Energy}</b> energy for the next.<br>`;
+        return explanation;
+      } else {
+        // Original explanation for regular questions
+        let chargeName = pair.charge.Move;
+        let chargeEnergy = pair.charge.Energy;
+        let n = pair.which;
+        let explanation = 
+          `Each <b>${fastName}</b> (Fast) gives <b>${fastEnergy}</b> energy.<br>` +
+          `You need <b>${chargeEnergy}</b> energy for each <b>${chargeName}</b> (Charged).<br>`;
+        let breakdown = [];
+        let energy = 0;
+        for (let i = 1; i <= n; i++) {
+          let thisFasts = 0;
+          let startingEnergy = energy;
+          let movesSoFar = [];
+          while (energy < chargeEnergy) {
+            energy += fastEnergy;
+            thisFasts++;
+            movesSoFar.push(startingEnergy + thisFasts * fastEnergy);
+          }
+          breakdown.push(
+            `For the ${getOrdinalText(i)} charged move:<br>` +
+            `&nbsp;&nbsp;Start with <b>${startingEnergy}</b> energy.<br>` +
+            `&nbsp;&nbsp;Each fast attack gives <b>${fastEnergy}</b> energy: <b>${movesSoFar.join(', ')}</b>.<br>` +
+            `&nbsp;&nbsp;After ${thisFasts} fast attacks you have <b>${startingEnergy + thisFasts*fastEnergy}</b> energy (≥ ${chargeEnergy} needed).<br>` +
+            `&nbsp;&nbsp;You spend ${chargeEnergy} for the charged move, leaving <b>${startingEnergy + thisFasts*fastEnergy - chargeEnergy}</b> energy for the next.<br>`
+          );
+          energy -= chargeEnergy;
+        }
+        explanation += breakdown.join('<br>');
+        return explanation;
+      }
+    }
+
+    // Quiz logic
+    let moves = [];
+    let movesByName = {};
+    let pokedex = [];
+    let currentPair = {};
+
+    // Fetch moves.csv and pokemon.json automatically
+    Promise.all([
+      fetch('moves.csv').then(r => r.text()),
+      fetch('pokemon.json').then(r => r.json())
+    ]).then(([csvData, pokeData]) => {
+      moves = parseCSV(csvData);
+      movesByName = {};
+      moves.forEach(mv => {
+        movesByName[mv.Move.trim().toUpperCase().replace(/ /g, "_")] = mv;
+        movesByName[mv.Move.trim()] = mv;
+      });
+      pokedex = pokeData;
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('quizSection').classList.remove('hidden');
+      showStats();
+      newQuestion();
+    }).catch(err => {
+      document.getElementById('loading').textContent = "Failed to load data. Make sure moves.csv and pokemon.json are present.";
+    });
+
+    function parseCSV(data) {
+      const lines = data.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim());
+      return lines.slice(1).map(line => {
+        let cells = [], cell = '', inQuotes = false;
+        for (let ch of line) {
+          if (ch === '"') inQuotes = !inQuotes;
+          else if (ch === ',' && !inQuotes) { cells.push(cell); cell = ''; }
+          else cell += ch;
+        }
+        cells.push(cell);
+        let obj = {};
+        headers.forEach((h, i) => {
+          obj[h] = cells[i] !== undefined ? cells[i].trim() : '';
+          if (['Energy'].includes(h)) {
+            obj[h] = obj[h] === '' ? NaN : parseInt(obj[h], 10);
+          }
+        });
+        return obj;
+      });
+    }
+
+    function pickEligiblePokemon() {
+      let eligible = pokedex.filter(poke => {
+        let fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
+        let chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
+        return fastList.length && chargeList.length;
+      });
+      if (!eligible.length) return null;
+      return eligible[Math.floor(Math.random() * eligible.length)];
+    }
+
+    function calcFastMovesForNthCharge(fastEnergy, chargeEnergy, n) {
+      let energy = 0;
+      let fasts = 0;
+      let fastsToEachCharge = [];
+      for(let i=1; i<=n; ++i) {
+        let thisChargeFasts = 0;
+        while (energy < chargeEnergy) {
+          energy += fastEnergy;
+          fasts++;
+          thisChargeFasts++;
+        }
+        energy -= chargeEnergy;
+        fastsToEachCharge.push(thisChargeFasts);
+      }
+      return fastsToEachCharge[n-1];
+    }
+
+    function newQuestion() {
+      document.getElementById('result').textContent = '';
+      document.getElementById('nextQuestion').classList.add('hidden');
+      document.getElementById('userAnswer').value = '';
+
+      // Multi-Charge: only ask for 1st-4th charged move, never combos
+      let pokemon = pickEligiblePokemon();
+      if (!pokemon) {
+        document.getElementById('question').textContent = 'No eligible Pokémon found. Please check your data files.';
+        document.getElementById('answerForm').classList.add('hidden');
+        return;
+      }
+      let fastList = (pokemon.fastMoves || []).filter(mv => !!movesByName[mv]);
+      let chargeList = (pokemon.chargedMoves || []).filter(mv => !!movesByName[mv]);
+      let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+      let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
+      let which = 1 + Math.floor(Math.random() * 4); // 1~4
+      let nthText = getOrdinalText(which);
+      let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
+      currentPair = { fast, charge, pokemon, needed, which, nthText, isCombo: false };
+      document.getElementById('question').textContent =
+        `How many "${fast.Move}" (Fast) are needed for the ${nthText} "${charge.Move}" (Charged) for ${pokemon.speciesName}?`;
+      document.getElementById('answerForm').classList.remove('hidden');
+    }
+
+    document.getElementById('answerForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const userAnswer = parseInt(document.getElementById('userAnswer').value, 10);
+      let wasCorrect = false;
+      if (userAnswer === currentPair.needed) {
+        document.getElementById('result').textContent = '✅ Correct!';
+        wasCorrect = true;
+      } else {
+        document.getElementById('result').textContent =
+          `❌ Incorrect. The correct answer is ${currentPair.needed}.`;
+      }
+      document.getElementById('result').innerHTML +=
+        "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>";
+      document.getElementById('nextQuestion').classList.remove('hidden');
+      stats.total++;
+      if (wasCorrect) stats.correct++;
+      saveStats();
+      showStats();
+    });
+
+    document.getElementById('nextQuestion').addEventListener('click', function() {
+      newQuestion();
+    });
+  </script>
+</body>
+</html>
