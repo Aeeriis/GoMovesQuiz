@@ -35,7 +35,7 @@
       <ul>
         <li><b>Basic</b> – "How many fast moves do you need for the <u>first</u> charged move?"</li>
         <li><b>Multi-Charge</b> – "How many fast moves do you need for the <u>1st, 2nd, 3rd, or 4th</u> charged move?"</li>
-        <li><b>Combo</b> – "After using a certain number of one charged move, how many fast moves are needed for a different charged move?"</li>
+        <li><b>Combo</b> – "After using a certain number of one charged move, how many fast moves are needed for a different charged move?" (Combo mode now also includes Multi-Charge questions; combo questions are 1/3 of the total)</li>
       </ul>
       After each answer, an explanation with energy breakdown is shown to help you learn!
     </div>
@@ -275,47 +275,69 @@
       }
 
       if (difficulty === "combo") {
-        // Only combo questions
-        // Pick Pokémon with at least 2 charged moves
-        let eligible = pokedex.filter(poke => {
-          let fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
-          let chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
-          return fastList.length && chargeList.length >= 2;
-        });
-        if (!eligible.length) return newQuestion(); // fallback
-        let pokemon = eligible[Math.floor(Math.random() * eligible.length)];
-        let fastList = (pokemon.fastMoves || []).filter(mv => !!movesByName[mv]);
-        let chargeList = (pokemon.chargedMoves || []).filter(mv => !!movesByName[mv]);
-        let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
-        let chargeAIdx = Math.floor(Math.random() * chargeList.length);
-        let chargeBIdx;
-        do { chargeBIdx = Math.floor(Math.random() * chargeList.length); } while (chargeBIdx === chargeAIdx);
-        let chargeA = movesByName[chargeList[chargeAIdx]];
-        let chargeB = movesByName[chargeList[chargeBIdx]];
-        let nA = 1 + Math.floor(Math.random() * 3); // 1-3 times
-        let energy = 0, totalFasts = 0;
-        for (let i=0; i<nA; ++i) {
-          while (energy < chargeA.Energy) {
-            energy += fast.Energy;
-            totalFasts++;
+        // Combo mode: 1/3 combo, 2/3 multi-charge
+        if (Math.random() < 1/3) {
+          // Combo question
+          let eligible = pokedex.filter(poke => {
+            let fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
+            let chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
+            return fastList.length && chargeList.length >= 2;
+          });
+          if (!eligible.length) return newQuestion(); // fallback
+          let pokemon = eligible[Math.floor(Math.random() * eligible.length)];
+          let fastList = (pokemon.fastMoves || []).filter(mv => !!movesByName[mv]);
+          let chargeList = (pokemon.chargedMoves || []).filter(mv => !!movesByName[mv]);
+          let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+          let chargeAIdx = Math.floor(Math.random() * chargeList.length);
+          let chargeBIdx;
+          do { chargeBIdx = Math.floor(Math.random() * chargeList.length); } while (chargeBIdx === chargeAIdx);
+          let chargeA = movesByName[chargeList[chargeAIdx]];
+          let chargeB = movesByName[chargeList[chargeBIdx]];
+          let nA = 1 + Math.floor(Math.random() * 3); // 1-3 times
+          let energy = 0, totalFasts = 0;
+          for (let i=0; i<nA; ++i) {
+            while (energy < chargeA.Energy) {
+              energy += fast.Energy;
+              totalFasts++;
+            }
+            energy -= chargeA.Energy;
           }
-          energy -= chargeA.Energy;
+          let neededFastsForB = 0;
+          let currentEnergy = energy;
+          while (currentEnergy < chargeB.Energy) {
+            currentEnergy += fast.Energy;
+            neededFastsForB++;
+          }
+          currentPair = {
+            fast, charge: chargeB, pokemon, needed: neededFastsForB, isCombo: true,
+            combo: { chargeA, nA, leftover: energy }
+          };
+          document.getElementById('question').textContent =
+            `${pokemon.speciesName} with ${fast.Move} (Fast) has thrown ${nA} ${chargeA.Move} (Charged).` +
+            ` How many more ${fast.Move} are needed for a ${chargeB.Move} (Charged) now?`;
+          document.getElementById('answerForm').classList.remove('hidden');
+          return;
+        } else {
+          // Multi-charge question (same as multi mode below)
+          let pokemon = pickEligiblePokemon();
+          if (!pokemon) {
+            document.getElementById('question').textContent = 'No eligible Pokémon found. Please check your data files.';
+            document.getElementById('answerForm').classList.add('hidden');
+            return;
+          }
+          let fastList = (pokemon.fastMoves || []).filter(mv => !!movesByName[mv]);
+          let chargeList = (pokemon.chargedMoves || []).filter(mv => !!movesByName[mv]);
+          let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+          let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
+          let which = 1 + Math.floor(Math.random() * 4); // 1~4
+          let nthText = getOrdinalText(which);
+          let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
+          currentPair = { fast, charge, pokemon, needed, which, nthText, isCombo: false };
+          document.getElementById('question').textContent =
+            `How many "${fast.Move}" (Fast) are needed for the ${nthText} "${charge.Move}" (Charged) for ${pokemon.speciesName}?`;
+          document.getElementById('answerForm').classList.remove('hidden');
+          return;
         }
-        let neededFastsForB = 0;
-        let currentEnergy = energy;
-        while (currentEnergy < chargeB.Energy) {
-          currentEnergy += fast.Energy;
-          neededFastsForB++;
-        }
-        currentPair = {
-          fast, charge: chargeB, pokemon, needed: neededFastsForB, isCombo: true,
-          combo: { chargeA, nA, leftover: energy }
-        };
-        document.getElementById('question').textContent =
-          `${pokemon.speciesName} with ${fast.Move} (Fast) has thrown ${nA} ${chargeA.Move} (Charged).` +
-          ` How many more ${fast.Move} are needed for a ${chargeB.Move} (Charged) now?`;
-        document.getElementById('answerForm').classList.remove('hidden');
-        return;
       }
 
       // Multi-Charge: only ask for 1st-4th charged move, never combos
