@@ -24,25 +24,63 @@
       display: none;
       position: fixed;
       left: 0; right: 0; bottom: 0;
-      background: rgba(250,250,255,0.92);
+      background: transparent;
       z-index: 100;
       text-align: center;
-      padding: 0.7em 0.2em 0.9em 0.2em;
-      box-shadow: 0 -2px 8px #bbb6;
-      border-top: 1px solid #dde;
+      pointer-events: none;
     }
     #fixedNextWrap.show {
       display: block;
     }
     #fixedNextBtn {
-      font-size: 1.1em;
-      padding: 0.7em 2em;
-      background: #228be6;
-      color: white;
-      border: none;
-      border-radius: 7px;
-      box-shadow: 0 2px 6px #0001;
+      font-size: 1.18em;
+      padding: 0.75em 2.2em;
+      background: #fff;
+      color: #228be6;
+      border: 2.5px solid #228be6;
+      border-radius: 32px;
+      box-shadow: 0 2px 14px #228be644, 0 1.5px 0 #eee inset;
+      font-weight: bold;
       cursor: pointer;
+      margin-bottom: 2.5em;
+      pointer-events: auto;
+      transition: background .18s, color .18s, border .18s;
+      position: relative;
+    }
+    #fixedNextBtn:hover, #fixedNextBtn:focus {
+      background: #228be6;
+      color: #fff;
+      border-color: #228be6;
+      outline: none;
+    }
+    #fixedNextBtn:active {
+      background: #1864ab;
+      color: #fff;
+      border-color: #1864ab;
+    }
+    #fixedNextWrap .close-next-btn {
+      background: none;
+      border: none;
+      font-size: 1.5em;
+      color: #888;
+      cursor: pointer;
+      position: absolute;
+      right: 0.2em;
+      top: -0.9em;
+      pointer-events: auto;
+      z-index: 3;
+      padding: 0;
+      line-height: 1;
+      opacity: 0.7;
+      transition: color .18s, opacity .15s;
+    }
+    #fixedNextWrap .close-next-btn:hover {
+      color: #228be6;
+      opacity: 1;
+    }
+    #fixedNextBtnWrap {
+      display: inline-block;
+      position: relative;
     }
     #timerSettingsWrap {
       margin-bottom: 1em;
@@ -127,10 +165,10 @@
       .container { padding: 0.5em; }
       #intro-explanation { font-size: 0.97em; }
       #fixedNextBtn { font-size: 1em; padding: 0.7em 1.5em; }
-      #fixedNextWrap { padding-bottom: 1.4em; }
+      #fixedNextWrap { padding-bottom: 0em; }
       #timerBox { font-size: 1em; gap: 0.7em; }
       #timerToggleLabel { font-size: 1em; }
-      #avgstats { font-size: 0.95em; }
+      #fixedNextBtn { margin-bottom: 2em; }
     }
   </style>
 </head>
@@ -181,9 +219,12 @@
       <button id="resetStats" style="margin-top:1em;">Reset Stats</button>
     </div>
   </div>
-  <!-- Fixed Next Question button at the bottom -->
+  <!-- Floating Next Question button, now draggable and can be closed -->
   <div id="fixedNextWrap">
-    <button id="fixedNextBtn" type="button">Next Question</button>
+    <span id="fixedNextBtnWrap">
+      <button id="fixedNextBtn" type="button">Next Question</button>
+      <button id="closeNextBtn" class="close-next-btn" title="Hide Next Question button" aria-label="Hide Next Question">&times;</button>
+    </span>
   </div>
   <script>
     // Stats logic (localStorage)
@@ -357,16 +398,25 @@
     let pokedex = [];
     let currentPair = {};
 
-    // Fixed Next Button
+    // Floating Next Button logic
     const fixedNextWrap = document.getElementById('fixedNextWrap');
     const fixedNextBtn = document.getElementById('fixedNextBtn');
+    const closeNextBtn = document.getElementById('closeNextBtn');
+    let floatingNextManuallyClosed = false;
+
     function showFixedNextButton(show) {
-      if (show) fixedNextWrap.classList.add('show');
+      if (show && !floatingNextManuallyClosed) fixedNextWrap.classList.add('show');
       else fixedNextWrap.classList.remove('show');
     }
     fixedNextBtn.onclick = function() {
+      floatingNextManuallyClosed = false;
       showFixedNextButton(false);
       newQuestion();
+    };
+    closeNextBtn.onclick = function(e) {
+      e.stopPropagation();
+      floatingNextManuallyClosed = true;
+      showFixedNextButton(false);
     };
 
     // Fetch moves.csv and pokemon.json automatically
@@ -442,6 +492,7 @@
       document.getElementById('result').textContent = '';
       document.getElementById('nextQuestion').classList.add('hidden');
       document.getElementById('userAnswer').value = '';
+      floatingNextManuallyClosed = false;
       showFixedNextButton(false);
       stopTimer();
       updateTimerVisibilityOnQuestion();
