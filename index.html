@@ -214,44 +214,50 @@
       margin-left: 0em;
       margin-top: 0.33em;
     }
-    #loginArea {
-      display: flex;
-      align-items: center;
-      gap: 1em;
-      margin-top: 1em;
-      margin-bottom: 1em;
-      justify-content: flex-end;
-    }
-    #userInfo {
-      font-size: 1.02em;
+    #levelBox {
+      margin: 1em 0 0.8em 0;
+      font-size: 1.10em;
       color: #234;
-      display: flex;
-      align-items: center;
-      gap: 0.6em;
+      background: #f4fafe;
+      border-radius: 10px;
+      padding: 0.7em 1.1em 0.8em 1.1em;
+      border: 1.5px solid #bee3f8;
+      display: inline-block;
+      min-width: 200px;
+      position: relative;
+      box-shadow: 0 2px 10px #228be611;
     }
-    #userAvatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: 1.5px solid #bbb;
-      object-fit: cover;
-      margin-left: 0.4em;
+    #levelXPBar {
+      width: 100%;
+      background: #d0e6fa;
+      border-radius: 6px;
+      height: 18px;
+      margin-top: 0.5em;
+      position: relative;
+      overflow: hidden;
     }
-    #logoutBtn, #loginBtn {
-      font-size: 1em;
-      padding: 0.4em 1em;
-      border-radius: 1em;
-      border: 2px solid #228be6;
-      background: #fff;
-      color: #228be6;
+    #levelXPBarInner {
+      background: linear-gradient(90deg,#228be6,#63c2ff);
+      height: 100%;
+      border-radius: 6px;
+      transition: width 0.5s cubic-bezier(.4,2,.3,1);
+      width: 0%;
+      min-width: 2.5%;
+    }
+    #levelUPMsg {
+      color: #f4930c;
       font-weight: bold;
-      cursor: pointer;
-      margin-left: 0.5em;
-      transition: background .15s, color .15s, border .15s;
+      font-size: 1.08em;
+      margin: 0.2em 0 0 0;
+      display: none;
+      animation: pop-in 0.85s cubic-bezier(.4,2,.3,1);
     }
-    #logoutBtn:hover, #loginBtn:hover {
-      background: #228be6;
-      color: #fff;
+    @keyframes pop-in {
+      0% { transform: scale(1.6); opacity: 0; }
+      30% { transform: scale(1.13); opacity: 1;}
+      60% { transform: scale(0.97);}
+      80% { transform: scale(1.03);}
+      100% { transform: scale(1); opacity: 1;}
     }
     @media (max-width: 600px) {
       h1 { font-size: 1.2em; }
@@ -280,134 +286,108 @@
     }
   </style>
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-    // Firebase config for your new project
-    const firebaseConfig = {
-      apiKey: "AIzaSyDVh54WSZUknCYU10kwzpiwcLsFvtJmMww",
-      authDomain: "gmcq-bb10c.firebaseapp.com",
-      projectId: "gmcq-bb10c",
-      storageBucket: "gmcq-bb10c.firebasestorage.app",
-      messagingSenderId: "751912438496",
-      appId: "1:751912438496:web:decd7330ada5d98bc65e85",
-      measurementId: "G-VL4SW1HNZM"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+    // ---- XP/LEVEL SYSTEM ----
+    function getLevelAndNextXP(xp) {
+      let thresholds = [0];
+      for(let lvl=1, req=100; lvl<100; ++lvl) {
+        thresholds[lvl] = thresholds[lvl-1] + req;
+        req += 50;
+        if (thresholds[lvl] > 1000000) break;
+      }
+      let level = 1;
+      for(let i=1; i<thresholds.length; ++i) {
+        if (xp < thresholds[i]) break;
+        level = i+1;
+      }
+      let prev = thresholds[level-2]||0, next = thresholds[level-1]||100;
+      return { level, prev, next };
+    }
+    function getXPForAnswer(isCorrect, elapsed, difficulty, score80) {
+      // XP reward table (per spec)
+      let xpCorrect, xpIncorrect, xpSpeed;
+      if (difficulty === "basic") {
+        xpCorrect = score80 ? 5 : 8;
+        xpIncorrect = score80 ? 1 : 2;
+        xpSpeed = score80 ? 2 : 3;
+      } else if (difficulty === "multi") {
+        xpCorrect = score80 ? 8 : 12;
+        xpIncorrect = score80 ? 2 : 3;
+        xpSpeed = score80 ? 3 : 5;
+      } else { // combo
+        xpCorrect = score80 ? 12 : 18;
+        xpIncorrect = score80 ? 3 : 5;
+        xpSpeed = score80 ? 4 : 7;
+      }
+      let xp = isCorrect ? xpCorrect : xpIncorrect;
+      if (isCorrect && typeof elapsed === "number" && elapsed > 0 && elapsed < 5) xp += xpSpeed;
+      return xp;
+    }
+    function animateXPBar(fromXP, toXP, levelDataFrom, levelDataTo) {
+      const bar = document.getElementById('levelXPBarInner');
+      const xpText = document.getElementById('levelXPText');
+      let start = null, duration = 600;
+      let fromLevel = levelDataFrom.level, toLevel = levelDataTo.level;
+      let fromFrac = (fromXP-levelDataFrom.prev)/(levelDataFrom.next-levelDataFrom.prev);
+      let toFrac = (toXP-levelDataTo.prev)/(levelDataTo.next-levelDataTo.prev);
+      function step(ts) {
+        if (!start) start = ts;
+        let t = Math.min((ts-start)/duration, 1);
+        let curFrac = fromFrac + (toFrac-fromFrac)*t;
+        let curLevel = fromLevel + (toLevel-fromLevel)*t;
+        if (toLevel !== fromLevel && t > 0.6) {
+          document.getElementById('levelUPMsg').style.display = "block";
+        }
+        let curXP = Math.round(fromXP + (toXP-fromXP)*t);
+        bar.style.width = (100*curFrac).toFixed(1)+"%";
+        xpText.textContent = `XP: ${curXP} / ${levelDataTo.next}`;
+        if (t < 1) requestAnimationFrame(step);
+        else setTimeout(()=>{document.getElementById('levelUPMsg').style.display="none";}, 1600);
+      }
+      requestAnimationFrame(step);
+    }
+    function setLevelUI(xp) {
+      const {level, prev, next} = getLevelAndNextXP(xp);
+      document.getElementById('levelNum').textContent = level;
+      document.getElementById('levelXPText').textContent = `XP: ${xp} / ${next}`;
+      const frac = (xp-prev)/(next-prev);
+      document.getElementById('levelXPBarInner').style.width = (100*frac).toFixed(1)+"%";
+      document.getElementById('levelUPMsg').style.display = "none";
+    }
+    // ---- END XP/LEVEL SYSTEM ----
 
     window.addEventListener('DOMContentLoaded', () => {
-      // --- LOGIN & GLOBAL STATS ---
-      const loginBtn = document.getElementById('loginBtn');
-      const logoutBtn = document.getElementById('logoutBtn');
-      const userInfo = document.getElementById('userInfo');
-      const statsDiv = document.getElementById('stats');
-      const avgstatsDiv = document.getElementById('avgstats');
-
-      let currentUser = null;
-      let stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
-
-      function updateUserUI(user) {
-        if (user) {
-          loginBtn.style.display = 'none';
-          logoutBtn.style.display = '';
-          userInfo.style.display = '';
-          userInfo.querySelector('#userName').textContent = user.displayName || user.email || user.uid;
-          userInfo.querySelector('#userAvatar').src = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || user.email || '?');
-        } else {
-          loginBtn.style.display = '';
-          logoutBtn.style.display = 'none';
-          userInfo.style.display = 'none';
-        }
+      // --- STATS (localStorage) ---
+      let stats = {
+        total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0, xp: 0
+      };
+      function loadStats() {
+        try {
+          let s = JSON.parse(localStorage.getItem("quizStats") || "{}");
+          stats = Object.assign({
+            total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0, xp: 0
+          }, s);
+        } catch(e) { /* ignore */ }
+        showStats();
       }
-
+      function saveStats() {
+        localStorage.setItem("quizStats", JSON.stringify(stats));
+      }
       function showStats() {
-        statsDiv.textContent =
+        document.getElementById('stats').textContent =
           `Score: ${stats.correct}/${stats.total} (${stats.total ? Math.round(100 * stats.correct / stats.total) : 0}%)`;
         let avg = stats.total ? (stats.sumTime / stats.total) : 0;
         let avgRight = stats.rightCount ? (stats.sumTimeRight / stats.rightCount) : 0;
-        avgstatsDiv.textContent =
+        document.getElementById('avgstats').textContent =
           `Average time: ${stats.total ? avg.toFixed(2) + " s" : "-"}   |   Average for correct: ${stats.rightCount ? avgRight.toFixed(2) + " s" : "-"}`;
+        setLevelUI(stats.xp || 0);
       }
-
-      async function loadStats(user) {
-        if (!user) return;
-        const statsRef = doc(db, "stats", user.uid);
-        const statsSnap = await getDoc(statsRef);
-        if (statsSnap.exists()) {
-          stats = statsSnap.data();
-          if (stats.sumTime === undefined) stats.sumTime = 0;
-          if (stats.sumTimeRight === undefined) stats.sumTimeRight = 0;
-          if (stats.rightCount === undefined) stats.rightCount = stats.correct || 0;
-        } else {
-          stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
-          await setDoc(statsRef, stats);
-        }
-        showStats();
-      }
-
-      async function saveStats() {
-        if (!currentUser) return;
-        const statsRef = doc(db, "stats", currentUser.uid);
-        await setDoc(statsRef, stats);
-      }
-
-      async function recordAnswer(isCorrect, elapsed) {
-        if (!currentUser) return;
-        await runTransaction(db, async (transaction) => {
-          const statsRef = doc(db, "stats", currentUser.uid);
-          const statsSnap = await transaction.get(statsRef);
-          let s = statsSnap.exists() ? statsSnap.data() : { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
-          s.total = (s.total || 0) + 1;
-          s.sumTime = (s.sumTime || 0) + (elapsed || 0);
-          if (isCorrect) {
-            s.correct = (s.correct || 0) + 1;
-            s.sumTimeRight = (s.sumTimeRight || 0) + (elapsed || 0);
-            s.rightCount = (s.rightCount || 0) + 1;
-          }
-          transaction.set(statsRef, s);
-          stats = s;
-        });
-        showStats();
-      }
-
-      document.getElementById('resetStats').onclick = async function() {
-        if (!currentUser) return;
-        stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
-        await saveStats();
+      document.getElementById('resetStats').onclick = function() {
+        stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0, xp: 0 };
+        saveStats();
         showStats();
       };
 
-      loginBtn.onclick = async function() {
-        const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider);
-      };
-      logoutBtn.onclick = async function() {
-        await signOut(auth);
-      };
-
-      onAuthStateChanged(auth, async (user) => {
-        currentUser = user;
-        updateUserUI(user);
-        if (user) await loadStats(user);
-        else {
-          stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
-          showStats();
-        }
-        document.getElementById('quizSection').classList.toggle('hidden', !user);
-      });
-
-      window.recordAnswer = recordAnswer;
-      window.showStats = showStats;
-      window.getStats = () => stats;
-
-      // ---- QUIZ LOGIC ----
-
+      // ---- QUIZ LOGIC (unchanged, except XP/level) ----
       // Meta CSVs
       const metaCSVFILES = [
         { file: "cp1500_all_overall_rankings.csv", label: "Great" },
@@ -664,7 +644,7 @@
         pokedex = pokeData;
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('quizSection').classList.remove('hidden');
-        window.showStats();
+        loadStats();
         populateMetaMenu();
       });
 
@@ -772,7 +752,7 @@
             document.getElementById('answerForm').classList.add('hidden');
             return;
           }
-          let which = 1; // Always 1st
+          let which = 1;
           let nthText = getOrdinalText(which);
           let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
           currentPair = { fast, charge, pokemon, needed, which, nthText, isCombo: false };
@@ -816,7 +796,7 @@
               tries < 30
             );
             if (!pokemon) return newQuestion();
-            let nA = 1 + Math.floor(Math.random() * 3); // 1-3 times
+            let nA = 1 + Math.floor(Math.random() * 3);
             let energy = 0, totalFasts = 0;
             for (let i=0; i<nA; ++i) {
               while (energy < chargeA.Energy) {
@@ -842,7 +822,6 @@
             startTimer();
             return;
           } else {
-            // multi-charge as fallback in combo mode
             let tries = 0, pokemon, fastList, chargeList, fast, charge, which;
             do {
               pokemon = pickEligiblePokemon();
@@ -851,7 +830,7 @@
               chargeList = getPreferredOrAllChargeMoves(pokemon);
               fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
               charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
-              which = 1 + Math.floor(Math.random() * 4); // 1~4
+              which = 1 + Math.floor(Math.random() * 4);
               tries++;
             } while (
               avoidTrickQuestions &&
@@ -883,7 +862,7 @@
           chargeList = getPreferredOrAllChargeMoves(pokemon);
           fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
           charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
-          which = 1 + Math.floor(Math.random() * 4); // 1~4
+          which = 1 + Math.floor(Math.random() * 4);
           tries++;
         } while (
           avoidTrickQuestions &&
@@ -904,7 +883,7 @@
         document.getElementById('answerForm').classList.remove('hidden');
         startTimer();
       }
-      document.getElementById('answerForm').addEventListener('submit', async function(e) {
+      document.getElementById('answerForm').addEventListener('submit', function(e) {
         e.preventDefault();
         stopTimer();
         const userAnswer = parseInt(document.getElementById('userAnswer').value, 10);
@@ -922,18 +901,32 @@
           elapsed = getTimerElapsed();
           timeText = "Answered in " + elapsed.toFixed(2) + " s";
         }
-        if (typeof elapsed === "number" && elapsed > 0) {
-          await window.recordAnswer(wasCorrect, elapsed);
-        } else {
-          await window.recordAnswer(wasCorrect, 0);
+        // XP/Level logic
+        let oldXP = stats.xp || 0;
+        // OnlyHighScore == Score>80 filter
+        let xpGain = getXPForAnswer(wasCorrect, elapsed, difficulty, onlyHighScore);
+        stats.xp = (stats.xp||0) + xpGain;
+        let from = getLevelAndNextXP(oldXP);
+        let to = getLevelAndNextXP(stats.xp);
+        animateXPBar(oldXP, stats.xp, from, to);
+
+        stats.total = (stats.total || 0) + 1;
+        stats.sumTime = (stats.sumTime || 0) + (elapsed || 0);
+        if (wasCorrect) {
+          stats.correct = (stats.correct || 0) + 1;
+          stats.sumTimeRight = (stats.sumTimeRight || 0) + (elapsed || 0);
+          stats.rightCount = (stats.rightCount || 0) + 1;
         }
+        saveStats();
+        showStats();
         updateTimerVisibilityOnAnswer(timeText);
         if (timerEnabled && timeText) {
           document.getElementById('result').innerHTML +=
             `<br><span style="color:#228be6;font-weight:bold;">${timeText}</span>`;
         }
         document.getElementById('result').innerHTML +=
-          "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>";
+          "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>" +
+          `<br><span style="color:#23a;font-size:1em;font-weight:bold;">+${xpGain} XP</span>`;
         showFixedNextButton(true);
       });
 
@@ -958,15 +951,14 @@
     <div class="disclaimer">
       <b>Disclaimer:</b> This entire app was created by AI (GitHub Copilot). All gameplay and meta data used here are from <a href="https://pvpoke.com" target="_blank" rel="noopener">pvpoke.com</a>.
     </div>
-    <div id="loginArea">
-      <span id="userInfo" style="display:none;">
-        <span id="userName"></span>
-        <img id="userAvatar" src="" alt="avatar">
-      </span>
-      <button id="loginBtn" type="button" style="display:none;">Login with Google</button>
-      <button id="logoutBtn" type="button" style="display:none;">Logout</button>
-    </div>
     <h1>Pokémon Go Moveset Energy Quiz</h1>
+    <div id="levelBox">
+      <span style="font-weight:bold;">Level <span id="levelNum">1</span></span>
+      <br>
+      <span id="levelXPText">XP: 0 / 100</span>
+      <div id="levelXPBar"><div id="levelXPBarInner"></div></div>
+      <div id="levelUPMsg">Level Up!</div>
+    </div>
     <div id="intro-explanation">
       <b>How the quiz works:</b>
       <ul>
