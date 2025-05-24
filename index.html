@@ -333,11 +333,11 @@
             return;
           }
           const head = lines[0].split(",");
-          const idxName = head.indexOf("speciesName");
-          const idxScore = head.map(x => x.trim().toLowerCase()).indexOf("score");
+          const idxName = head.findIndex(h => h.trim().toLowerCase() === "pokemon");
+          const idxScore = head.findIndex(h => h.trim().toLowerCase() === "score");
           if (idxName === -1 || idxScore === -1) {
             metaPokes = [];
-            document.getElementById('metaWarn').textContent = "Meta CSV missing speciesName or score column.";
+            document.getElementById('metaWarn').textContent = "Meta CSV missing Pokemon or Score column.";
             return;
           }
           metaPokes = lines.slice(1)
