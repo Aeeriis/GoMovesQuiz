@@ -321,32 +321,25 @@
       if (isCorrect && typeof elapsed === "number" && elapsed > 0 && elapsed < 5) xp += xpSpeed;
       return xp;
     }
-    function animateXPBar(fromXP, toXP, levelDataFrom, levelDataTo, onComplete) {
+    function animateXPBar(fromXP, toXP) {
       const bar = document.getElementById('levelXPBarInner');
       const xpText = document.getElementById('levelXPText');
       let start = null, duration = 600;
-      let fromLevel = levelDataFrom.level, toLevel = levelDataTo.level;
-      let fromFrac = (fromXP-levelDataFrom.prev)/(levelDataFrom.next-levelDataFrom.prev);
-      let toFrac = (toXP-levelDataTo.prev)/(levelDataTo.next-levelDataTo.prev);
       function step(ts) {
         if (!start) start = ts;
         let t = Math.min((ts-start)/duration, 1);
-        let curFrac = fromFrac + (toFrac-fromFrac)*t;
-        let curLevel = fromLevel + (toLevel-fromLevel)*t;
-        if (toLevel !== fromLevel && t > 0.6) {
+        let curXP = Math.round(fromXP + (toXP-fromXP)*t);
+        let curLevelData = getLevelAndNextXP(curXP);
+        let barFrac = (curXP-curLevelData.prev) / (curLevelData.next-curLevelData.prev);
+        bar.style.width = (100 * barFrac).toFixed(1) + "%";
+        xpText.textContent = `XP: ${curXP} / ${curLevelData.next}`;
+        if (curLevelData.level > getLevelAndNextXP(fromXP).level) {
           document.getElementById('levelUPMsg').style.display = "block";
         }
-        let curXP = Math.round(fromXP + (toXP-fromXP)*t);
-        let showLevelData = (t < 1) ? levelDataFrom : levelDataTo;
-        let xpForDisplay = (t < 1) ? curXP : toXP;
-        let barFrac = (t < 1) ? curFrac : toFrac;
-        bar.style.width = (100*barFrac).toFixed(1)+"%";
-        xpText.textContent = `XP: ${xpForDisplay} / ${showLevelData.next}`;
         if (t < 1) requestAnimationFrame(step);
         else {
-          setLevelUI(toXP); // Ensure bar and XP text snap to the new level's goal
+          setLevelUI(toXP);
           setTimeout(()=>{document.getElementById('levelUPMsg').style.display="none";}, 1600);
-          if (onComplete) onComplete();
         }
       }
       requestAnimationFrame(step);
@@ -395,8 +388,7 @@
         }
       };
 
-      // ---- QUIZ LOGIC (unchanged, except XP/level) ----
-      // Meta CSVs
+      // ---- QUIZ LOGIC ----
       const metaCSVFILES = [
         { file: "cp1500_all_overall_rankings.csv", label: "Great" },
         { file: "cp2500_all_overall_rankings.csv", label: "Ultra" },
@@ -912,9 +904,7 @@
         let oldXP = stats.xp || 0;
         let xpGain = getXPForAnswer(wasCorrect, elapsed, difficulty, onlyHighScore);
         stats.xp = (stats.xp||0) + xpGain;
-        let from = getLevelAndNextXP(oldXP);
-        let to = getLevelAndNextXP(stats.xp);
-        animateXPBar(oldXP, stats.xp, from, to);
+        animateXPBar(oldXP, stats.xp);
 
         stats.total = (stats.total || 0) + 1;
         stats.sumTime = (stats.sumTime || 0) + (elapsed || 0);
