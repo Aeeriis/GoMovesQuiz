@@ -274,27 +274,26 @@
     </span>
   </div>
   <script>
-    // HARDCODE ALL YOUR META CSVs HERE (update as you add or remove files in rankings/)
+    // HARDCODED metas, sorted and renamed as requested:
     const metaCSVFILES = [
-      "cp10000_all_overall_rankings.csv",
-      "cp10000_battlefrontiermaster_overall_rankings.csv",
-      "cp10000_premier_overall_rankings.csv",
-      "cp1500_all_overall_rankings.csv",
-      "cp1500_catch_overall_rankings.csv",
-      "cp1500_gbinvitational_overall_rankings.csv",
-      "cp1500_rivalry_overall_rankings.csv",
-      "cp1500_tempo_overall_rankings.csv",
-      "cp1500_wasteland_overall_rankings.csv",
-      "cp2500_all_overall_rankings.csv",
-      "cp2500_battlefrontierultra_overall_rankings.csv"
-      // ...add/remove as needed
+      { file: "cp1500_all_overall_rankings.csv", label: "Great" },
+      { file: "cp2500_all_overall_rankings.csv", label: "Ultra" },
+      { file: "cp10000_all_overall_rankings.csv", label: "Master" },
+      { file: "cp10000_premier_overall_rankings.csv", label: "Master Premier" },
+      { file: "cp1500_tempo_overall_rankings.csv", label: "Tempo" },
+      { file: "cp1500_wasteland_overall_rankings.csv", label: "Wasteland" },
+      { file: "cp2500_battlefrontierultra_overall_rankings.csv", label: "Battlefrontier Ultra" },
+      { file: "cp10000_battlefrontiermaster_overall_rankings.csv", label: "Battlefrontier Master" },
+      { file: "cp1500_gbinvitational_overall_rankings.csv", label: "Gymbreakers Invitational" },
+      { file: "cp1500_rivalry_overall_rankings.csv", label: "Rivalry" },
+      { file: "cp1500_catch_overall_rankings.csv", label: "Catch Cup" }
     ];
     const githubUser = "Aeeriis";
     const githubRepo = "GoMovesQuiz";
     const metaRootURL = `https://raw.githubusercontent.com/${githubUser}/${githubRepo}/main/rankings/`;
 
     let metaPokes = [];
-    let currentMeta = localStorage.getItem("quizMeta") || metaCSVFILES[0];
+    let currentMeta = localStorage.getItem("quizMeta") || metaCSVFILES[0].file;
     let onlyHighScore = localStorage.getItem("onlyHighScore") === "true";
 
     function populateMetaMenu() {
@@ -302,8 +301,8 @@
       metaSelect.innerHTML = "";
       metaCSVFILES.forEach(meta => {
         let opt = document.createElement("option");
-        opt.value = meta;
-        opt.textContent = meta.replace(/\.csv$/,"");
+        opt.value = meta.file;
+        opt.textContent = meta.label;
         metaSelect.appendChild(opt);
       });
       metaSelect.value = currentMeta;
