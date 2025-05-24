@@ -246,8 +246,93 @@
 </head>
 <body>
   <div class="container">
-    <!-- ... rest of your HTML ... -->
-    <!-- (unchanged, omitted here for brevity, see your previous message) -->
+    <div class="disclaimer">
+      <b>Disclaimer:</b> This entire app was created by AI (GitHub Copilot). All gameplay and meta data used here are from <a href="https://pvpoke.com" target="_blank" rel="noopener">pvpoke.com</a>.
+    </div>
+    <h1>Pokémon Go Moveset Energy Quiz</h1>
+    <div id="intro-explanation">
+      <b>How the quiz works:</b>
+      <ul>
+        <li><b>Basic</b> – How many fast moves do you need for the <u>first</u> charged move?</li>
+        <li><b>Multi-Charge</b> – How many fast moves do you need for the <u>1st, 2nd, 3rd, or 4th</u> charged move?</li>
+        <li><b>Combo</b> – After using a certain number of one charged move, how many fast moves are needed for a different charged move? (Combo mode now also includes Multi-Charge questions; combo questions are 1/3 of the total)</li>
+      </ul>
+      After each answer, an explanation with energy breakdown is shown to help you learn!
+    </div>
+    <div id="difficultyWrap">
+      <label for="difficultySelect"><b>Difficulty:</b></label>
+      <select id="difficultySelect">
+        <option value="basic">Basic</option>
+        <option value="multi">Multi-Charge</option>
+        <option value="combo">Combo</option>
+      </select>
+    </div>
+    <div id="metaSettingsWrap">
+      <div id="metaBox">
+        <label for="metaSelect"><b>Meta:</b></label>
+        <select id="metaSelect"></select>
+      </div>
+      <div id="metaToggleWrap">
+        <label id="metaScoreLabel" title="Only show Pokémon with score above 80 in this meta">
+          <input type="checkbox" id="metaScore" />
+          Only Score &gt; 80
+        </label>
+        <label id="metaPrefLabel" title="Only use preferred movesets for each Pokémon (from PvPoke meta)">
+          <input type="checkbox" id="metaPref" />
+          Preferred moveset only
+        </label>
+        <label id="noTrickLabel" title="Avoid 'trick questions' where every charged move always leaves 0 energy (e.g. Extrasensory/Rock Tomb)">
+          <input type="checkbox" id="noTrick" />
+          Avoid trick questions
+        </label>
+      </div>
+      <div id="metaScoreExplain">
+        <b>What does "Score &gt; 80" mean?</b><br>
+        This limits the Pokémon pool to only those with an <b>overall score above 80 in the selected meta on <a href="https://pvpoke.com" target="_blank" rel="noopener">pvpoke.com</a></b>.<br>
+        Higher overall score means the Pokémon is more competitively viable in that meta.
+      </div>
+      <div id="metaPrefExplain">
+        <b>What does "Preferred moveset only" mean?</b><br>
+        This only asks about the best/most recommended movesets for each Pokémon, as listed in the selected meta's CSV (columns <b>Fast Move</b>, <b>Charged Move 1</b> and <b>Charged Move 2</b>).
+      </div>
+      <div id="noTrickExplain">
+        <b>What does "Avoid trick questions" mean?</b><br>
+        Some fast/charged move combinations (e.g. Extrasensory and Rock Tomb) always leave you with exactly 0 energy after each charged move, which means the answer for the 2nd, 3rd, etc. charged move is always exactly the same as the 1st (no leftover energy ever). When enabled, this setting avoids generating these repetitive, "trick" questions.
+      </div>
+      <div id="metaWarn" style="color:#b00;font-size:0.98em;padding:0.1em 0 0.2em 0;"></div>
+      <div style="font-size:0.9em;color:#888;margin-top:0.2em;">
+        <span>Metas loaded from <a href="https://github.com/Aeeriis/GoMovesQuiz/tree/main/rankings" target="_blank">GitHub rankings/</a> folder.</span>
+      </div>
+    </div>
+    <div id="timerSettingsWrap">
+      <label id="timerToggleLabel">
+        <span class="switch">
+          <input type="checkbox" id="timerToggle">
+          <span class="slider"></span>
+        </span>
+        Show time
+      </label>
+      <div id="timerBox">
+        <span id="timer"></span>
+      </div>
+    </div>
+    <div id="levelstats"></div>
+    <div id="xpstats"></div>
+    <div id="levelupReward"></div>
+    <div id="stats"></div>
+    <div id="avgstats"></div>
+    <div id="loading">Loading data...</div>
+    <div class="quiz-section hidden" id="quizSection">
+      <div id="question"></div>
+      <form id="answerForm">
+        <label for="userAnswer">Your answer:</label>
+        <input type="number" id="userAnswer" min="1" required autocomplete="off" />
+        <button type="submit">Check</button>
+      </form>
+      <div class="result" id="result"></div>
+      <button id="nextQuestion" class="hidden" style="display:none;">Next Question</button>
+      <button id="resetStats" style="margin-top:1em;">Reset Stats</button>
+    </div>
   </div>
   <div class="copyright">
     Pokémon and Pokémon GO are copyright of The Pokémon Company, Niantic, Inc., and Nintendo. All trademarked images and names are property of their respective owners, and any such material is used on this site for educational purposes only.
@@ -258,7 +343,7 @@
     </span>
   </div>
   <script>
-    // --- XP / LEVELS / REWARDS / ANTI-FARMING ---
+    // --- XP / LEVELS / REWARDS ---
     const LEVELUP_REWARDS = [
       { emoji: "🍏", name: "Apple",        rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
       { emoji: "🍌", name: "Banana",       rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
@@ -307,9 +392,8 @@
       }
       return LEVELUP_REWARDS[0];
     }
-    let xpState = JSON.parse(localStorage.getItem('quizXP') || '{"xp":0,"fruitBag":{}, "answeredQuestions":{}}');
+    let xpState = JSON.parse(localStorage.getItem('quizXP') || '{"xp":0,"fruitBag":{}}');
     if (!xpState.fruitBag) xpState.fruitBag = {};
-    if (!xpState.answeredQuestions) xpState.answeredQuestions = {};
     function saveXP() { localStorage.setItem('quizXP', JSON.stringify(xpState)); }
     function showXP() {
       const info = getLevelInfo(xpState.xp);
@@ -349,88 +433,6 @@
         `<b>Level Up!</b> You received a <b>${fruit.rarity} ${fruit.name}</b>!`;
       setTimeout(() => { div.textContent = ""; }, 5500);
     }
-    function getQuestionHash(pair) {
-      if (!pair) return "";
-      let key = [
-        pair.pokemon && pair.pokemon.speciesName,
-        pair.fast && pair.fast.Move,
-        pair.charge && pair.charge.Move,
-        pair.which,
-        pair.isCombo,
-        pair.combo ? (pair.combo.chargeA && pair.combo.chargeA.Move) : "",
-        pair.combo ? pair.combo.nA : ""
-      ].join("|");
-      return btoa(unescape(encodeURIComponent(key)));
-    }
-    // ...rest of your code unchanged...
-
-    // The full answerForm submit handler (with anti-farming XP logic):
-    document.getElementById('answerForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      stopTimer();
-      const userAnswer = parseInt(document.getElementById('userAnswer').value, 10);
-      let wasCorrect = false;
-      if (userAnswer === currentPair.needed) {
-        document.getElementById('result').textContent = '✅ Correct!';
-        wasCorrect = true;
-      } else {
-        document.getElementById('result').textContent =
-          `❌ Incorrect. The correct answer is ${currentPair.needed}.`;
-      }
-      let timeText = "";
-      let elapsed = 0;
-      if (timerEnabled && typeof timerStart === "number" && timerStart > 0) {
-        elapsed = getTimerElapsed();
-        timeText = "Answered in " + elapsed.toFixed(2) + " s";
-      }
-      if (typeof elapsed === "number" && elapsed > 0) {
-        stats.sumTime = (stats.sumTime || 0) + elapsed;
-        if (wasCorrect) {
-          stats.sumTimeRight = (stats.sumTimeRight || 0) + elapsed;
-          stats.rightCount = (stats.rightCount || 0) + 1;
-        }
-      }
-      updateTimerVisibilityOnAnswer(timeText);
-      if (timerEnabled && timeText) {
-        document.getElementById('result').innerHTML +=
-          `<br><span style="color:#228be6;font-weight:bold;">${timeText}</span>`;
-      }
-      document.getElementById('result').innerHTML +=
-        "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>";
-      showFixedNextButton(true);
-      stats.total++;
-      if (wasCorrect) stats.correct++;
-      saveStats();
-      showStats();
-
-      // --- XP LOGIC WITH ANTI-FARMING ---
-      if (wasCorrect) {
-        if (!xpState.answeredQuestions) xpState.answeredQuestions = {};
-        const qHash = getQuestionHash(currentPair);
-        if (!xpState.answeredQuestions[qHash]) {
-          const xpGain = calcXP(difficulty, onlyHighScore);
-          let prevXP = xpState.xp;
-          xpState.xp += xpGain;
-          xpState.answeredQuestions[qHash] = true;
-          let prevLevel = getLevelInfo(prevXP).level;
-          let newLevel = getLevelInfo(xpState.xp).level;
-          saveXP();
-          showXP();
-          if (newLevel > prevLevel) {
-            let fruit = getRandomFruitReward();
-            if (!xpState.fruitBag[fruit.emoji]) xpState.fruitBag[fruit.emoji] = 0;
-            xpState.fruitBag[fruit.emoji]++;
-            saveXP();
-            showXP();
-            showLevelupReward(fruit);
-          } else {
-            showLevelupReward(null);
-          }
-        } else {
-          showLevelupReward(null);
-        }
-      }
-    });
     // -- Meta settings (CSV file list) --
     const metaCSVFILES = [
       { file: "cp1500_all_overall_rankings.csv", label: "Great" },
