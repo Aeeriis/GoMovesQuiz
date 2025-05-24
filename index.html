@@ -17,7 +17,7 @@
     #question { font-size: 1.15em; margin-bottom: 1em; }
     #stats { font-size: 1.1em; margin: 0.8em 0; }
     #difficultySelect, #timerToggle { font-size: 1em; margin-bottom: 1em;}
-    #difficultyWrap { margin-bottom: 1em; }
+    #difficultyWrap { margin-bottom: 0.2em; }
     #intro-explanation { margin: 1.1em 0 0.7em 0; background: #f0f7ff; border-radius: 8px; padding: 0.8em; font-size: 1.07em; color: #234; }
     #fixedNextWrap {
       display: none;
@@ -43,16 +43,23 @@
       box-shadow: 0 2px 6px #0001;
       cursor: pointer;
     }
-
+    #timerSettingsWrap {
+      margin-bottom: 1em;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
     #timerBox {
       font-size: 1.08em;
       color: #333;
-      margin: 0.5em 0 0.8em 0;
+      margin: 0; /* keep tight under toggle */
+      margin-bottom: 0.8em;
       display: flex;
       align-items: center;
       gap: 1.2em;
       user-select: none;
       justify-content: flex-start;
+      padding-left: 0;
     }
     #timer {
       min-width: 7em;
@@ -112,6 +119,7 @@
       display: flex;
       align-items: center;
       margin-left: 0em;
+      margin-top: 0.33em;
     }
     @media (max-width: 600px) {
       h1 { font-size: 1.2em; }
@@ -144,8 +152,7 @@
         <option value="combo">Combo</option>
       </select>
     </div>
-    <div id="timerBox">
-      <span id="timer"></span>
+    <div id="timerSettingsWrap">
       <label id="timerToggleLabel">
         <span class="switch">
           <input type="checkbox" id="timerToggle">
@@ -153,6 +160,9 @@
         </span>
         Show time
       </label>
+      <div id="timerBox">
+        <span id="timer"></span>
+      </div>
     </div>
     <div id="stats"></div>
     <div id="loading">Loading data...</div>
