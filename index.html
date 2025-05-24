@@ -19,6 +19,15 @@
       text-align: center;
       border: 1px solid #d0d8e8;
     }
+    .copyright {
+      font-size: 0.83em;
+      color: #666;
+      text-align: center;
+      margin-top: 2.3em;
+      margin-bottom: 0.7em;
+      padding: 0 0.6em;
+      line-height: 1.5;
+    }
     h1 { font-size: 1.6em; }
     .quiz-section { margin-top: 2em; }
     .result { margin-top: 1em; font-weight: bold; }
@@ -228,6 +237,7 @@
       }
       #metaScoreExplain, #metaPrefExplain, #noTrickExplain { font-size: 0.88em; padding-left: 0.3em; }
       .disclaimer { font-size: 0.95em; padding: 0.56em 0.7em; }
+      .copyright { font-size: 0.78em; }
     }
   </style>
 </head>
@@ -317,6 +327,9 @@
       <button id="nextQuestion" class="hidden" style="display:none;">Next Question</button>
       <button id="resetStats" style="margin-top:1em;">Reset Stats</button>
     </div>
+  </div>
+  <div class="copyright">
+    Pokémon and Pokémon GO are copyright of The Pokémon Company, Niantic, Inc., and Nintendo. All trademarked images and names are property of their respective owners, and any such material is used on this site for educational purposes only.
   </div>
   <div id="fixedNextWrap">
     <span id="fixedNextBtnWrap">
@@ -435,8 +448,6 @@
 
     // Trick question detection: returns true if using this fast/charge combo always leaves energy 0 after each use
     function isTrickCombo(fastEnergy, chargeEnergy) {
-      // Trick if: chargeEnergy % fastEnergy == 0 AND chargeEnergy/fastEnergy * fastEnergy == chargeEnergy
-      // and after every cycle, leftover is 0
       if (!fastEnergy || !chargeEnergy) return false;
       return (chargeEnergy % fastEnergy === 0);
     }
