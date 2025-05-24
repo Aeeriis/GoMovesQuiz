@@ -369,10 +369,10 @@
       { emoji: "🍫", name: "Cupuaçu",      rarity: "🔴 Legendary", prob: 0.66, rarityKey: "Legendary" }
     ];
     function calcXP(difficulty, onlyHighScore) {
-      let base = 10;
-      if (difficulty === "multi") base = 20;
-      else if (difficulty === "combo") base = 30;
-      if (onlyHighScore) base = Math.round(base * 1.5);
+      let base = 7;
+      if (difficulty === "multi") base = 12;
+      else if (difficulty === "combo") base = 18;
+      if (onlyHighScore) base = Math.round(base * 0.67);
       return base;
     }
     function getLevelInfo(xp) {
