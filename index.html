@@ -16,7 +16,7 @@
     label { font-size: 1.1em; }
     #question { font-size: 1.15em; margin-bottom: 1em; }
     #stats { font-size: 1.1em; margin: 0.8em 0; }
-    #difficultySelect { font-size: 1em; margin-bottom: 1em;}
+    #difficultySelect, #timerToggle { font-size: 1em; margin-bottom: 1em;}
     #difficultyWrap { margin-bottom: 1em; }
     #intro-explanation { margin: 1.1em 0 0.7em 0; background: #f0f7ff; border-radius: 8px; padding: 0.8em; font-size: 1.07em; color: #234; }
     #fixedNextWrap {
@@ -43,12 +43,27 @@
       box-shadow: 0 2px 6px #0001;
       cursor: pointer;
     }
+    #timerBox {
+      font-size: 1.05em;
+      color: #333;
+      margin: 0.5em 0 0.8em 0;
+      display: flex;
+      align-items: center;
+      gap: 1em;
+      user-select: none;
+    }
+    #timerToggleLabel {
+      font-size: 0.97em;
+      user-select: none;
+      cursor: pointer;
+    }
     @media (max-width: 600px) {
       h1 { font-size: 1.2em; }
       .container { padding: 0.5em; }
       #intro-explanation { font-size: 0.97em; }
       #fixedNextBtn { font-size: 1em; padding: 0.7em 1.5em; }
       #fixedNextWrap { padding-bottom: 1.4em; }
+      #timerBox { font-size: 0.95em; gap: 0.7em; }
     }
   </style>
 </head>
@@ -71,6 +86,13 @@
         <option value="multi">Multi-Charge</option>
         <option value="combo">Combo</option>
       </select>
+    </div>
+    <div id="timerBox">
+      <span id="timer" style="min-width:6em;display:inline-block;"></span>
+      <label id="timerToggleLabel">
+        <input type="checkbox" id="timerToggle" style="vertical-align:middle;margin-right:0.2em;">
+        Show timer
+      </label>
     </div>
     <div id="stats"></div>
     <div id="loading">Loading data...</div>
@@ -101,6 +123,57 @@
         `Score: ${stats.correct}/${stats.total} (${stats.total ? Math.round(100 * stats.correct / stats.total) : 0}%)`;
     }
     showStats();
+
+    // Timer logic
+    let timerStart = null, timerInterval = null, timerActive = false;
+    const timerSpan = document.getElementById('timer');
+    const timerBox = document.getElementById('timerBox');
+    const timerToggle = document.getElementById('timerToggle');
+    const timerToggleLabel = document.getElementById('timerToggleLabel');
+    // Remember timer preference
+    let timerEnabled = localStorage.getItem('timerEnabled');
+    if (timerEnabled === null) timerEnabled = "true";
+    timerEnabled = timerEnabled === "true";
+    timerToggle.checked = timerEnabled;
+    updateTimerVisibility();
+
+    timerToggle.onchange = function() {
+      timerEnabled = timerToggle.checked;
+      localStorage.setItem('timerEnabled', timerEnabled ? "true" : "false");
+      updateTimerVisibility();
+    };
+    function updateTimerVisibility() {
+      if (timerEnabled) {
+        timerSpan.style.visibility = "visible";
+      } else {
+        timerSpan.style.visibility = "hidden";
+      }
+    }
+    function startTimer() {
+      if (!timerEnabled) { timerSpan.textContent = ""; timerActive = false; return; }
+      timerStart = Date.now();
+      timerSpan.textContent = "0.00 s";
+      timerActive = true;
+      timerInterval = setInterval(() => {
+        if (!timerActive) return;
+        let elapsed = (Date.now() - timerStart) / 1000;
+        timerSpan.textContent = elapsed.toFixed(2) + " s";
+      }, 60);
+    }
+    function stopTimer(showFinal=true) {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = null;
+      if (!timerEnabled) { timerSpan.textContent = ""; return; }
+      timerActive = false;
+      if (showFinal && timerStart) {
+        let elapsed = (Date.now() - timerStart) / 1000;
+        timerSpan.textContent = elapsed.toFixed(2) + " s";
+      }
+    }
+    function getTimerElapsed() {
+      if (!timerStart) return 0;
+      return (Date.now() - timerStart) / 1000;
+    }
 
     // Difficulty logic
     let difficulty = localStorage.getItem("quizDifficulty") || "multi";
@@ -289,6 +362,7 @@
       document.getElementById('nextQuestion').classList.add('hidden');
       document.getElementById('userAnswer').value = '';
       showFixedNextButton(false);
+      stopTimer(false);
 
       if (difficulty === "basic") {
         // Only ask for first charged move
@@ -309,6 +383,7 @@
         document.getElementById('question').textContent =
           `How many "${fast.Move}" (Fast) are needed for the 1st "${charge.Move}" (Charged) for ${pokemon.speciesName}?`;
         document.getElementById('answerForm').classList.remove('hidden');
+        startTimer();
         return;
       }
 
@@ -354,6 +429,7 @@
             `${pokemon.speciesName} with ${fast.Move} (Fast) has thrown ${nA} ${chargeA.Move} (Charged).` +
             ` How many more ${fast.Move} are needed for a ${chargeB.Move} (Charged) now?`;
           document.getElementById('answerForm').classList.remove('hidden');
+          startTimer();
           return;
         } else {
           // Multi-charge question (same as multi mode below)
@@ -374,6 +450,7 @@
           document.getElementById('question').textContent =
             `How many "${fast.Move}" (Fast) are needed for the ${nthText} "${charge.Move}" (Charged) for ${pokemon.speciesName}?`;
           document.getElementById('answerForm').classList.remove('hidden');
+          startTimer();
           return;
         }
       }
@@ -396,10 +473,12 @@
       document.getElementById('question').textContent =
         `How many "${fast.Move}" (Fast) are needed for the ${nthText} "${charge.Move}" (Charged) for ${pokemon.speciesName}?`;
       document.getElementById('answerForm').classList.remove('hidden');
+      startTimer();
     }
 
     document.getElementById('answerForm').addEventListener('submit', function(e) {
       e.preventDefault();
+      stopTimer();
       const userAnswer = parseInt(document.getElementById('userAnswer').value, 10);
       let wasCorrect = false;
       if (userAnswer === currentPair.needed) {
@@ -408,6 +487,12 @@
       } else {
         document.getElementById('result').textContent =
           `❌ Incorrect. The correct answer is ${currentPair.needed}.`;
+      }
+      // Show the timer result if enabled and timer was running
+      if (timerEnabled && typeof timerStart === "number" && timerStart > 0) {
+        let elapsed = getTimerElapsed();
+        document.getElementById('result').innerHTML +=
+          `<br><span style="color:#228be6;font-weight:bold;">Answered in ${elapsed.toFixed(2)} s</span>`;
       }
       document.getElementById('result').innerHTML +=
         "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>";
