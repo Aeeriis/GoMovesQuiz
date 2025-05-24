@@ -43,18 +43,19 @@
       box-shadow: 0 2px 6px #0001;
       cursor: pointer;
     }
+
     #timerBox {
-      font-size: 1.05em;
+      font-size: 1.08em;
       color: #333;
       margin: 0.5em 0 0.8em 0;
       display: flex;
       align-items: center;
-      gap: 1em;
+      gap: 1.2em;
       user-select: none;
       justify-content: flex-start;
     }
     #timer {
-      min-width: 6em;
+      min-width: 7em;
       font-weight: bold;
       display: inline-block;
       text-align: left;
@@ -71,7 +72,8 @@
       width: 46px;
       height: 28px;
       vertical-align: middle;
-      margin-right: 0.6em;
+      margin-right: 0.5em;
+      flex-shrink: 0;
     }
     .switch input { opacity: 0; width: 0; height: 0; }
     .slider {
@@ -103,13 +105,13 @@
       transform: translateX(17px);
     }
     #timerToggleLabel {
-      font-size: 0.97em;
+      font-size: 1.07em;
       user-select: none;
       cursor: pointer;
-      font-weight: 500;
+      font-weight: bold;
       display: flex;
       align-items: center;
-      margin-left: 0.4em;
+      margin-left: 0em;
     }
     @media (max-width: 600px) {
       h1 { font-size: 1.2em; }
@@ -117,8 +119,8 @@
       #intro-explanation { font-size: 0.97em; }
       #fixedNextBtn { font-size: 1em; padding: 0.7em 1.5em; }
       #fixedNextWrap { padding-bottom: 1.4em; }
-      #timerBox { font-size: 0.95em; gap: 0.7em; }
-      #timerToggleLabel { font-size: 0.95em; }
+      #timerBox { font-size: 1em; gap: 0.7em; }
+      #timerToggleLabel { font-size: 1em; }
     }
   </style>
 </head>
