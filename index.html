@@ -303,7 +303,6 @@
       return { level, prev, next };
     }
     function getXPForAnswer(isCorrect, elapsed, difficulty, score80) {
-      // XP reward table (per spec)
       let xpCorrect, xpIncorrect, xpSpeed;
       if (difficulty === "basic") {
         xpCorrect = score80 ? 5 : 8;
@@ -313,7 +312,7 @@
         xpCorrect = score80 ? 8 : 12;
         xpIncorrect = score80 ? 2 : 3;
         xpSpeed = score80 ? 3 : 5;
-      } else { // combo
+      } else {
         xpCorrect = score80 ? 12 : 18;
         xpIncorrect = score80 ? 3 : 5;
         xpSpeed = score80 ? 4 : 7;
@@ -322,7 +321,7 @@
       if (isCorrect && typeof elapsed === "number" && elapsed > 0 && elapsed < 5) xp += xpSpeed;
       return xp;
     }
-    function animateXPBar(fromXP, toXP, levelDataFrom, levelDataTo) {
+    function animateXPBar(fromXP, toXP, levelDataFrom, levelDataTo, onComplete) {
       const bar = document.getElementById('levelXPBarInner');
       const xpText = document.getElementById('levelXPText');
       let start = null, duration = 600;
@@ -338,10 +337,17 @@
           document.getElementById('levelUPMsg').style.display = "block";
         }
         let curXP = Math.round(fromXP + (toXP-fromXP)*t);
-        bar.style.width = (100*curFrac).toFixed(1)+"%";
-        xpText.textContent = `XP: ${curXP} / ${levelDataTo.next}`;
+        let showLevelData = (t < 1) ? levelDataFrom : levelDataTo;
+        let xpForDisplay = (t < 1) ? curXP : toXP;
+        let barFrac = (t < 1) ? curFrac : toFrac;
+        bar.style.width = (100*barFrac).toFixed(1)+"%";
+        xpText.textContent = `XP: ${xpForDisplay} / ${showLevelData.next}`;
         if (t < 1) requestAnimationFrame(step);
-        else setTimeout(()=>{document.getElementById('levelUPMsg').style.display="none";}, 1600);
+        else {
+          setLevelUI(toXP); // Ensure bar and XP text snap to the new level's goal
+          setTimeout(()=>{document.getElementById('levelUPMsg').style.display="none";}, 1600);
+          if (onComplete) onComplete();
+        }
       }
       requestAnimationFrame(step);
     }
@@ -382,9 +388,11 @@
         setLevelUI(stats.xp || 0);
       }
       document.getElementById('resetStats').onclick = function() {
-        stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0, xp: 0 };
-        saveStats();
-        showStats();
+        if (confirm("Are you sure you want to reset your stats? This cannot be undone.")) {
+          stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0, xp: 0 };
+          saveStats();
+          showStats();
+        }
       };
 
       // ---- QUIZ LOGIC (unchanged, except XP/level) ----
@@ -901,9 +909,7 @@
           elapsed = getTimerElapsed();
           timeText = "Answered in " + elapsed.toFixed(2) + " s";
         }
-        // XP/Level logic
         let oldXP = stats.xp || 0;
-        // OnlyHighScore == Score>80 filter
         let xpGain = getXPForAnswer(wasCorrect, elapsed, difficulty, onlyHighScore);
         stats.xp = (stats.xp||0) + xpGain;
         let from = getLevelAndNextXP(oldXP);
