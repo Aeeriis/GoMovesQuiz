@@ -214,6 +214,45 @@
       margin-left: 0em;
       margin-top: 0.33em;
     }
+    #loginArea {
+      display: flex;
+      align-items: center;
+      gap: 1em;
+      margin-top: 1em;
+      margin-bottom: 1em;
+      justify-content: flex-end;
+    }
+    #userInfo {
+      font-size: 1.02em;
+      color: #234;
+      display: flex;
+      align-items: center;
+      gap: 0.6em;
+    }
+    #userAvatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1.5px solid #bbb;
+      object-fit: cover;
+      margin-left: 0.4em;
+    }
+    #logoutBtn, #loginBtn {
+      font-size: 1em;
+      padding: 0.4em 1em;
+      border-radius: 1em;
+      border: 2px solid #228be6;
+      background: #fff;
+      color: #228be6;
+      font-weight: bold;
+      cursor: pointer;
+      margin-left: 0.5em;
+      transition: background .15s, color .15s, border .15s;
+    }
+    #logoutBtn:hover, #loginBtn:hover {
+      background: #228be6;
+      color: #fff;
+    }
     @media (max-width: 600px) {
       h1 { font-size: 1.2em; }
       .container { padding: 0.5em; }
@@ -240,11 +279,692 @@
       .copyright { font-size: 0.78em; }
     }
   </style>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // Firebase config for your new project
+    const firebaseConfig = {
+      apiKey: "AIzaSyDVh54WSZUknCYU10kwzpiwcLsFvtJmMww",
+      authDomain: "gmcq-bb10c.firebaseapp.com",
+      projectId: "gmcq-bb10c",
+      storageBucket: "gmcq-bb10c.firebasestorage.app",
+      messagingSenderId: "751912438496",
+      appId: "1:751912438496:web:decd7330ada5d98bc65e85",
+      measurementId: "G-VL4SW1HNZM"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    window.addEventListener('DOMContentLoaded', () => {
+      // --- LOGIN & GLOBAL STATS ---
+      const loginBtn = document.getElementById('loginBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const userInfo = document.getElementById('userInfo');
+      const statsDiv = document.getElementById('stats');
+      const avgstatsDiv = document.getElementById('avgstats');
+
+      let currentUser = null;
+      let stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
+
+      function updateUserUI(user) {
+        if (user) {
+          loginBtn.style.display = 'none';
+          logoutBtn.style.display = '';
+          userInfo.style.display = '';
+          userInfo.querySelector('#userName').textContent = user.displayName || user.email || user.uid;
+          userInfo.querySelector('#userAvatar').src = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || user.email || '?');
+        } else {
+          loginBtn.style.display = '';
+          logoutBtn.style.display = 'none';
+          userInfo.style.display = 'none';
+        }
+      }
+
+      function showStats() {
+        statsDiv.textContent =
+          `Score: ${stats.correct}/${stats.total} (${stats.total ? Math.round(100 * stats.correct / stats.total) : 0}%)`;
+        let avg = stats.total ? (stats.sumTime / stats.total) : 0;
+        let avgRight = stats.rightCount ? (stats.sumTimeRight / stats.rightCount) : 0;
+        avgstatsDiv.textContent =
+          `Average time: ${stats.total ? avg.toFixed(2) + " s" : "-"}   |   Average for correct: ${stats.rightCount ? avgRight.toFixed(2) + " s" : "-"}`;
+      }
+
+      async function loadStats(user) {
+        if (!user) return;
+        const statsRef = doc(db, "stats", user.uid);
+        const statsSnap = await getDoc(statsRef);
+        if (statsSnap.exists()) {
+          stats = statsSnap.data();
+          if (stats.sumTime === undefined) stats.sumTime = 0;
+          if (stats.sumTimeRight === undefined) stats.sumTimeRight = 0;
+          if (stats.rightCount === undefined) stats.rightCount = stats.correct || 0;
+        } else {
+          stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
+          await setDoc(statsRef, stats);
+        }
+        showStats();
+      }
+
+      async function saveStats() {
+        if (!currentUser) return;
+        const statsRef = doc(db, "stats", currentUser.uid);
+        await setDoc(statsRef, stats);
+      }
+
+      async function recordAnswer(isCorrect, elapsed) {
+        if (!currentUser) return;
+        await runTransaction(db, async (transaction) => {
+          const statsRef = doc(db, "stats", currentUser.uid);
+          const statsSnap = await transaction.get(statsRef);
+          let s = statsSnap.exists() ? statsSnap.data() : { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
+          s.total = (s.total || 0) + 1;
+          s.sumTime = (s.sumTime || 0) + (elapsed || 0);
+          if (isCorrect) {
+            s.correct = (s.correct || 0) + 1;
+            s.sumTimeRight = (s.sumTimeRight || 0) + (elapsed || 0);
+            s.rightCount = (s.rightCount || 0) + 1;
+          }
+          transaction.set(statsRef, s);
+          stats = s;
+        });
+        showStats();
+      }
+
+      document.getElementById('resetStats').onclick = async function() {
+        if (!currentUser) return;
+        stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
+        await saveStats();
+        showStats();
+      };
+
+      loginBtn.onclick = async function() {
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+      };
+      logoutBtn.onclick = async function() {
+        await signOut(auth);
+      };
+
+      onAuthStateChanged(auth, async (user) => {
+        currentUser = user;
+        updateUserUI(user);
+        if (user) await loadStats(user);
+        else {
+          stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
+          showStats();
+        }
+        document.getElementById('quizSection').classList.toggle('hidden', !user);
+      });
+
+      window.recordAnswer = recordAnswer;
+      window.showStats = showStats;
+      window.getStats = () => stats;
+
+      // ---- QUIZ LOGIC ----
+
+      // Meta CSVs
+      const metaCSVFILES = [
+        { file: "cp1500_all_overall_rankings.csv", label: "Great" },
+        { file: "cp2500_all_overall_rankings.csv", label: "Ultra" },
+        { file: "cp10000_all_overall_rankings.csv", label: "Master" },
+        { file: "cp10000_premier_overall_rankings.csv", label: "Master Premier" },
+        { file: "cp1500_tempo_overall_rankings.csv", label: "Tempo" },
+        { file: "cp1500_wasteland_overall_rankings.csv", label: "Wasteland" },
+        { file: "cp2500_battlefrontierultra_overall_rankings.csv", label: "Battlefrontier Ultra" },
+        { file: "cp10000_battlefrontiermaster_overall_rankings.csv", label: "Battlefrontier Master" },
+        { file: "cp1500_gbinvitational_overall_rankings.csv", label: "Gymbreakers Invitational" },
+        { file: "cp1500_rivalry_overall_rankings.csv", label: "Rivalry" },
+        { file: "cp1500_catch_overall_rankings.csv", label: "Catch Cup" }
+      ];
+      const githubUser = "Aeeriis";
+      const githubRepo = "GoMovesQuiz";
+      const metaRootURL = `https://raw.githubusercontent.com/${githubUser}/${githubRepo}/main/rankings/`;
+
+      let metaPokes = [];
+      let metaPreferred = {};
+      let currentMeta = localStorage.getItem("quizMeta") || metaCSVFILES[0].file;
+      let onlyHighScore = localStorage.getItem("onlyHighScore") === "true";
+      let onlyPreferredMoveset = localStorage.getItem("onlyPreferredMoveset") === "true";
+      let avoidTrickQuestions = localStorage.getItem("avoidTrickQuestions") === "true";
+
+      function populateMetaMenu() {
+        const metaSelect = document.getElementById('metaSelect');
+        metaSelect.innerHTML = "";
+        metaCSVFILES.forEach(meta => {
+          let opt = document.createElement("option");
+          opt.value = meta.file;
+          opt.textContent = meta.label;
+          metaSelect.appendChild(opt);
+        });
+        metaSelect.value = currentMeta;
+        document.getElementById('metaScore').checked = onlyHighScore;
+        document.getElementById('metaPref').checked = onlyPreferredMoveset;
+        document.getElementById('noTrick').checked = avoidTrickQuestions;
+        loadMetaAndApply();
+      }
+      document.getElementById('metaSelect').onchange = function() {
+        currentMeta = this.value;
+        localStorage.setItem("quizMeta", currentMeta);
+        loadMetaAndApply();
+      };
+      document.getElementById('metaScore').onchange = function() {
+        onlyHighScore = this.checked;
+        localStorage.setItem("onlyHighScore", onlyHighScore);
+        loadMetaAndApply();
+      };
+      document.getElementById('metaPref').onchange = function() {
+        onlyPreferredMoveset = this.checked;
+        localStorage.setItem("onlyPreferredMoveset", onlyPreferredMoveset);
+        loadMetaAndApply();
+      };
+      document.getElementById('noTrick').onchange = function() {
+        avoidTrickQuestions = this.checked;
+        localStorage.setItem("avoidTrickQuestions", avoidTrickQuestions);
+        loadMetaAndApply();
+      };
+
+      function loadMetaAndApply() {
+        document.getElementById('metaWarn').textContent = "";
+        metaPreferred = {};
+        if (!currentMeta) { metaPokes = []; return; }
+        fetch(metaRootURL + encodeURIComponent(currentMeta))
+          .then(r => r.text())
+          .then(csv => {
+            const lines = csv.trim().split(/\r?\n/);
+            if (lines.length < 2) {
+              metaPokes = [];
+              document.getElementById('metaWarn').textContent = "No Pokémon found for this meta.";
+              return;
+            }
+            const head = lines[0].split(",");
+            const idxName = head.findIndex(h => h.trim().toLowerCase() === "pokemon");
+            const idxScore = head.findIndex(h => h.trim().toLowerCase() === "score");
+            const idxFM = head.findIndex(h => h.trim().toLowerCase() === "fast move");
+            const idxC1 = head.findIndex(h => h.trim().toLowerCase() === "charged move 1");
+            const idxC2 = head.findIndex(h => h.trim().toLowerCase() === "charged move 2");
+            if (idxName === -1 || idxScore === -1) {
+              metaPokes = [];
+              document.getElementById('metaWarn').textContent = "Meta CSV missing Pokemon or Score column.";
+              return;
+            }
+            metaPokes = [];
+            metaPreferred = {};
+            lines.slice(1).forEach(rowstr => {
+              const row = rowstr.split(",");
+              const name = row[idxName];
+              const score = parseFloat(row[idxScore]);
+              if (!onlyHighScore || score > 80) {
+                metaPokes.push(name);
+              }
+              if (idxFM !== -1 && idxC1 !== -1 && idxC2 !== -1) {
+                metaPreferred[name] = {
+                  fast: row[idxFM],
+                  charge1: row[idxC1],
+                  charge2: row[idxC2]
+                };
+              }
+            });
+            if (!metaPokes.length) {
+              document.getElementById('metaWarn').textContent = "No Pokémon with Score > 80 in this meta.";
+            }
+            newQuestion();
+          });
+      }
+
+      function isTrickCombo(fastEnergy, chargeEnergy) {
+        if (!fastEnergy || !chargeEnergy) return false;
+        return (chargeEnergy % fastEnergy === 0);
+      }
+
+      // Timer logic
+      let timerStart = null, timerInterval = null, timerActive = false;
+      const timerSpan = document.getElementById('timer');
+      const timerBox = document.getElementById('timerBox');
+      const timerToggle = document.getElementById('timerToggle');
+      const timerToggleLabel = document.getElementById('timerToggleLabel');
+      let timerEnabled = localStorage.getItem('timerEnabled');
+      if (timerEnabled === null) timerEnabled = "true";
+      timerEnabled = timerEnabled === "true";
+      timerToggle.checked = timerEnabled;
+      function updateTimerVisibilityOnQuestion() {
+        timerSpan.classList.remove('timer-visible');
+        timerSpan.textContent = "";
+      }
+      function updateTimerVisibilityOnAnswer(timeText) {
+        if (timerEnabled && timeText) {
+          timerSpan.textContent = timeText;
+          timerSpan.classList.add('timer-visible');
+        } else {
+          timerSpan.classList.remove('timer-visible');
+          timerSpan.textContent = "";
+        }
+      }
+      timerToggle.onchange = function() {
+        timerEnabled = timerToggle.checked;
+        localStorage.setItem('timerEnabled', timerEnabled ? "true" : "false");
+        if (!timerEnabled) updateTimerVisibilityOnAnswer();
+      };
+      function startTimer() {
+        timerStart = Date.now();
+        timerActive = true;
+        timerSpan.classList.remove('timer-visible');
+        timerSpan.textContent = "";
+        if (timerInterval) clearInterval(timerInterval);
+      }
+      function stopTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = null;
+        timerActive = false;
+      }
+      function getTimerElapsed() {
+        if (!timerStart) return 0;
+        return (Date.now() - timerStart) / 1000;
+      }
+      // Difficulty logic
+      let difficulty = localStorage.getItem("quizDifficulty") || "multi";
+      document.getElementById('difficultySelect').value = difficulty;
+      document.getElementById('difficultySelect').onchange = function() {
+        difficulty = this.value;
+        localStorage.setItem("quizDifficulty", difficulty);
+        newQuestion();
+      };
+
+      function getOrdinalText(n) {
+        return ["1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th"][n-1] || (n+"th");
+      }
+      function getExplanation(pair) {
+        let fastName = pair.fast.Move;
+        let fastEnergy = pair.fast.Energy;
+        if (pair.isCombo) {
+          let chargeA = pair.combo.chargeA, nA = pair.combo.nA, chargeB = pair.charge;
+          let explanation =
+            `Each <b>${fastName}</b> (Fast) gives <b>${fastEnergy}</b> energy.<br>` +
+            `First, ${nA} <b>${chargeA.Move}</b> (Charged) are used. Each costs <b>${chargeA.Energy}</b> energy.<br>`;
+          let log = [];
+          let energy = 0, totalFasts = 0;
+          for (let i=1; i<=nA; ++i) {
+            let thisFasts = 0, startEnergy = energy;
+            let movesSoFar = [];
+            while (energy < chargeA.Energy) {
+              energy += fastEnergy;
+              totalFasts++;
+              thisFasts++;
+              movesSoFar.push(startEnergy + thisFasts * fastEnergy);
+            }
+            log.push(`For the ${getOrdinalText(i)} ${chargeA.Move}:<br>` +
+              `&nbsp;&nbsp;Start with <b>${startEnergy}</b> energy.<br>` +
+              `&nbsp;&nbsp;Each fast attack gives <b>${fastEnergy}</b> energy: <b>${movesSoFar.join(', ')}</b>.<br>` +
+              `&nbsp;&nbsp;After ${thisFasts} fast attacks you have <b>${startEnergy + thisFasts * fastEnergy}</b> energy (≥ ${chargeA.Energy} needed).<br>` +
+              `&nbsp;&nbsp;You spend ${chargeA.Energy} for the charged move, leaving <b>${startEnergy + thisFasts*fastEnergy - chargeA.Energy}</b> energy for the next.<br>`
+            );
+            energy -= chargeA.Energy;
+          }
+          let beforeB = energy;
+          let fastsForB = 0, breakdownB = [];
+          let energyB = beforeB;
+          while (energyB < chargeB.Energy) {
+            energyB += fastEnergy;
+            fastsForB++;
+            breakdownB.push(beforeB + fastsForB * fastEnergy);
+          }
+          explanation += log.join('<br>') + `<br>After those, you have <b>${beforeB}</b> energy.<br>`;
+          explanation += `Each fast attack gives <b>${fastEnergy}</b> energy: <b>${breakdownB.join(', ')}</b>.<br>`;
+          explanation += `After ${fastsForB} fast attacks you have <b>${beforeB + fastsForB*fastEnergy}</b> energy (≥ ${chargeB.Energy} needed).<br>`;
+          explanation += `You spend ${chargeB.Energy} for the charged move, leaving <b>${beforeB + fastsForB*fastEnergy - chargeB.Energy}</b> energy for the next.<br>`;
+          return explanation;
+        } else {
+          let chargeName = pair.charge.Move;
+          let chargeEnergy = pair.charge.Energy;
+          let n = pair.which;
+          let explanation = 
+            `Each <b>${fastName}</b> (Fast) gives <b>${fastEnergy}</b> energy.<br>` +
+            `You need <b>${chargeEnergy}</b> energy for each <b>${chargeName}</b> (Charged).<br>`;
+          let breakdown = [];
+          let energy = 0;
+          for (let i = 1; i <= n; i++) {
+            let thisFasts = 0;
+            let startingEnergy = energy;
+            let movesSoFar = [];
+            while (energy < chargeEnergy) {
+              energy += fastEnergy;
+              thisFasts++;
+              movesSoFar.push(startingEnergy + thisFasts * fastEnergy);
+            }
+            breakdown.push(
+              `For the ${getOrdinalText(i)} charged move:<br>` +
+              `&nbsp;&nbsp;Start with <b>${startingEnergy}</b> energy.<br>` +
+              `&nbsp;&nbsp;Each fast attack gives <b>${fastEnergy}</b> energy: <b>${movesSoFar.join(', ')}</b>.<br>` +
+              `&nbsp;&nbsp;After ${thisFasts} fast attacks you have <b>${startingEnergy + thisFasts*fastEnergy}</b> energy (≥ ${chargeEnergy} needed).<br>` +
+              `&nbsp;&nbsp;You spend ${chargeEnergy} for the charged move, leaving <b>${startingEnergy + thisFasts*fastEnergy - chargeEnergy}</b> energy for the next.<br>`
+            );
+            energy -= chargeEnergy;
+          }
+          explanation += breakdown.join('<br>');
+          return explanation;
+        }
+      }
+      let moves = [], movesByName = {}, pokedex = [], currentPair = {};
+
+      Promise.all([
+        fetch('moves.csv').then(r => r.text()),
+        fetch('pokemon.json').then(r => r.json())
+      ]).then(([csvData, pokeData]) => {
+        moves = parseCSV(csvData);
+        movesByName = {};
+        moves.forEach(mv => {
+          movesByName[mv.Move.trim().toUpperCase().replace(/ /g, "_")] = mv;
+          movesByName[mv.Move.trim()] = mv;
+        });
+        pokedex = pokeData;
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('quizSection').classList.remove('hidden');
+        window.showStats();
+        populateMetaMenu();
+      });
+
+      function parseCSV(data) {
+        const lines = data.trim().split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
+        return lines.slice(1).map(line => {
+          let cells = [], cell = '', inQuotes = false;
+          for (let ch of line) {
+            if (ch === '"') inQuotes = !inQuotes;
+            else if (ch === ',' && !inQuotes) { cells.push(cell); cell = ''; }
+            else cell += ch;
+          }
+          cells.push(cell);
+          let obj = {};
+          headers.forEach((h, i) => {
+            obj[h] = cells[i] !== undefined ? cells[i].trim() : '';
+            if (['Energy'].includes(h)) {
+              obj[h] = obj[h] === '' ? NaN : parseInt(obj[h], 10);
+            }
+          });
+          return obj;
+        });
+      }
+
+      function pickEligiblePokemon() {
+        let eligible = pokedex.filter(poke => {
+          let name = poke.speciesName;
+          let fastList, chargeList;
+          if (onlyPreferredMoveset && metaPreferred[name]) {
+            fastList = [metaPreferred[name].fast].filter(mv => !!movesByName[mv]);
+            chargeList = [metaPreferred[name].charge1, metaPreferred[name].charge2].filter(mv => !!movesByName[mv]);
+          } else {
+            fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
+            chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
+          }
+          return fastList.length && chargeList.length && (!metaPokes.length || metaPokes.includes(name));
+        });
+        if (!eligible.length) return null;
+        return eligible[Math.floor(Math.random() * eligible.length)];
+      }
+
+      function getPreferredOrAllFastMoves(poke) {
+        let name = poke.speciesName;
+        if (onlyPreferredMoveset && metaPreferred[name]) {
+          let fm = metaPreferred[name].fast;
+          return [fm].filter(mv => !!movesByName[mv]);
+        }
+        return (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
+      }
+      function getPreferredOrAllChargeMoves(poke) {
+        let name = poke.speciesName;
+        if (onlyPreferredMoveset && metaPreferred[name]) {
+          let c1 = metaPreferred[name].charge1;
+          let c2 = metaPreferred[name].charge2;
+          return [c1, c2].filter((mv, i, arr) => mv && arr.indexOf(mv) === i && !!movesByName[mv]);
+        }
+        return (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
+      }
+
+      function calcFastMovesForNthCharge(fastEnergy, chargeEnergy, n) {
+        let energy = 0;
+        let fastsToEachCharge = [];
+        for(let i=1; i<=n; ++i) {
+          let thisChargeFasts = 0;
+          while (energy < chargeEnergy) {
+            energy += fastEnergy;
+            thisChargeFasts++;
+          }
+          energy -= chargeEnergy;
+          fastsToEachCharge.push(thisChargeFasts);
+        }
+        return fastsToEachCharge[n-1];
+      }
+      function newQuestion() {
+        document.getElementById('result').textContent = '';
+        document.getElementById('nextQuestion').classList.add('hidden');
+        document.getElementById('userAnswer').value = '';
+        showFixedNextButton(false);
+        stopTimer();
+        updateTimerVisibilityOnQuestion();
+        if (!metaPokes.length) {
+          document.getElementById('question').textContent = "No eligible Pokémon for this meta and filter.";
+          document.getElementById('answerForm').classList.add('hidden');
+          return;
+        }
+        // --- BASIC ---
+        if (difficulty === "basic") {
+          let tries = 0, pokemon, fastList, chargeList, fast, charge;
+          do {
+            pokemon = pickEligiblePokemon();
+            if (!pokemon) break;
+            fastList = getPreferredOrAllFastMoves(pokemon);
+            chargeList = getPreferredOrAllChargeMoves(pokemon);
+            fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+            charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
+            tries++;
+          } while (
+            avoidTrickQuestions &&
+            isTrickCombo(fast.Energy, charge.Energy) &&
+            tries < 30
+          );
+          if (!pokemon) {
+            document.getElementById('question').textContent = 'No eligible Pokémon found. Please check your data files.';
+            document.getElementById('answerForm').classList.add('hidden');
+            return;
+          }
+          let which = 1; // Always 1st
+          let nthText = getOrdinalText(which);
+          let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
+          currentPair = { fast, charge, pokemon, needed, which, nthText, isCombo: false };
+          document.getElementById('question').textContent =
+            `How many "${fast.Move}" (Fast) are needed for the 1st "${charge.Move}" (Charged) for ${pokemon.speciesName}?`;
+          document.getElementById('answerForm').classList.remove('hidden');
+          startTimer();
+          return;
+        }
+        // --- COMBO ---
+        if (difficulty === "combo") {
+          if (Math.random() < 1/3) {
+            let tries = 0, pokemon, fastList, chargeList, chargeAIdx, chargeBIdx, fast, chargeA, chargeB;
+            do {
+              let eligible = pokedex.filter(poke => {
+                let name = poke.speciesName;
+                let fList, cList;
+                if (onlyPreferredMoveset && metaPreferred[name]) {
+                  fList = [metaPreferred[name].fast].filter(mv => !!movesByName[mv]);
+                  cList = [metaPreferred[name].charge1, metaPreferred[name].charge2].filter(mv => !!movesByName[mv]);
+                } else {
+                  fList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
+                  cList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
+                }
+                return fList.length && cList.length >= 2 && (!metaPokes.length || metaPokes.includes(name));
+              });
+              if (!eligible.length) break;
+              pokemon = eligible[Math.floor(Math.random() * eligible.length)];
+              fastList = getPreferredOrAllFastMoves(pokemon);
+              chargeList = getPreferredOrAllChargeMoves(pokemon);
+              chargeAIdx = Math.floor(Math.random() * chargeList.length);
+              do { chargeBIdx = Math.floor(Math.random() * chargeList.length); } while (chargeBIdx === chargeAIdx);
+              fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+              chargeA = movesByName[chargeList[chargeAIdx]];
+              chargeB = movesByName[chargeList[chargeBIdx]];
+              tries++;
+            } while (
+              avoidTrickQuestions &&
+              isTrickCombo(fast.Energy, chargeA.Energy) &&
+              isTrickCombo(fast.Energy, chargeB.Energy) &&
+              tries < 30
+            );
+            if (!pokemon) return newQuestion();
+            let nA = 1 + Math.floor(Math.random() * 3); // 1-3 times
+            let energy = 0, totalFasts = 0;
+            for (let i=0; i<nA; ++i) {
+              while (energy < chargeA.Energy) {
+                energy += fast.Energy;
+                totalFasts++;
+              }
+              energy -= chargeA.Energy;
+            }
+            let neededFastsForB = 0;
+            let currentEnergy = energy;
+            while (currentEnergy < chargeB.Energy) {
+              currentEnergy += fast.Energy;
+              neededFastsForB++;
+            }
+            currentPair = {
+              fast, charge: chargeB, pokemon, needed: neededFastsForB, isCombo: true,
+              combo: { chargeA, nA, leftover: energy }
+            };
+            document.getElementById('question').textContent =
+              `${pokemon.speciesName} with ${fast.Move} (Fast) has thrown ${nA} ${chargeA.Move} (Charged).` +
+              ` How many more ${fast.Move} are needed for a ${chargeB.Move} (Charged) now?`;
+            document.getElementById('answerForm').classList.remove('hidden');
+            startTimer();
+            return;
+          } else {
+            // multi-charge as fallback in combo mode
+            let tries = 0, pokemon, fastList, chargeList, fast, charge, which;
+            do {
+              pokemon = pickEligiblePokemon();
+              if (!pokemon) break;
+              fastList = getPreferredOrAllFastMoves(pokemon);
+              chargeList = getPreferredOrAllChargeMoves(pokemon);
+              fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+              charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
+              which = 1 + Math.floor(Math.random() * 4); // 1~4
+              tries++;
+            } while (
+              avoidTrickQuestions &&
+              isTrickCombo(fast.Energy, charge.Energy) &&
+              which > 1 &&
+              tries < 30
+            );
+            if (!pokemon) {
+              document.getElementById('question').textContent = 'No eligible Pokémon found. Please check your data files.';
+              document.getElementById('answerForm').classList.add('hidden');
+              return;
+            }
+            let nthText = getOrdinalText(which);
+            let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
+            currentPair = { fast, charge, pokemon, needed, which, nthText, isCombo: false };
+            document.getElementById('question').textContent =
+              `How many "${fast.Move}" (Fast) are needed for the ${nthText} "${charge.Move}" (Charged) for ${pokemon.speciesName}?`;
+            document.getElementById('answerForm').classList.remove('hidden');
+            startTimer();
+            return;
+          }
+        }
+        // --- MULTI-CHARGE ---
+        let tries = 0, pokemon, fastList, chargeList, fast, charge, which;
+        do {
+          pokemon = pickEligiblePokemon();
+          if (!pokemon) break;
+          fastList = getPreferredOrAllFastMoves(pokemon);
+          chargeList = getPreferredOrAllChargeMoves(pokemon);
+          fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+          charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
+          which = 1 + Math.floor(Math.random() * 4); // 1~4
+          tries++;
+        } while (
+          avoidTrickQuestions &&
+          isTrickCombo(fast.Energy, charge.Energy) &&
+          which > 1 &&
+          tries < 30
+        );
+        if (!pokemon) {
+          document.getElementById('question').textContent = 'No eligible Pokémon found. Please check your data files.';
+          document.getElementById('answerForm').classList.add('hidden');
+          return;
+        }
+        let nthText = getOrdinalText(which);
+        let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
+        currentPair = { fast, charge, pokemon, needed, which, nthText, isCombo: false };
+        document.getElementById('question').textContent =
+          `How many "${fast.Move}" (Fast) are needed for the ${nthText} "${charge.Move}" (Charged) for ${pokemon.speciesName}?`;
+        document.getElementById('answerForm').classList.remove('hidden');
+        startTimer();
+      }
+      document.getElementById('answerForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        stopTimer();
+        const userAnswer = parseInt(document.getElementById('userAnswer').value, 10);
+        let wasCorrect = false;
+        if (userAnswer === currentPair.needed) {
+          document.getElementById('result').textContent = '✅ Correct!';
+          wasCorrect = true;
+        } else {
+          document.getElementById('result').textContent =
+            `❌ Incorrect. The correct answer is ${currentPair.needed}.`;
+        }
+        let timeText = "";
+        let elapsed = 0;
+        if (timerEnabled && typeof timerStart === "number" && timerStart > 0) {
+          elapsed = getTimerElapsed();
+          timeText = "Answered in " + elapsed.toFixed(2) + " s";
+        }
+        if (typeof elapsed === "number" && elapsed > 0) {
+          await window.recordAnswer(wasCorrect, elapsed);
+        } else {
+          await window.recordAnswer(wasCorrect, 0);
+        }
+        updateTimerVisibilityOnAnswer(timeText);
+        if (timerEnabled && timeText) {
+          document.getElementById('result').innerHTML +=
+            `<br><span style="color:#228be6;font-weight:bold;">${timeText}</span>`;
+        }
+        document.getElementById('result').innerHTML +=
+          "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>";
+        showFixedNextButton(true);
+      });
+
+      // Floating Next Button logic
+      const fixedNextWrap = document.getElementById('fixedNextWrap');
+      const fixedNextBtn = document.getElementById('fixedNextBtn');
+      function showFixedNextButton(show) {
+        if (show) fixedNextWrap.classList.add('show');
+        else fixedNextWrap.classList.remove('show');
+      }
+      fixedNextBtn.onclick = function() {
+        showFixedNextButton(false);
+        newQuestion();
+      };
+      document.getElementById('nextQuestion').style.display = "none";
+      // ---- END QUIZ LOGIC ----
+    });
+  </script>
 </head>
 <body>
   <div class="container">
     <div class="disclaimer">
       <b>Disclaimer:</b> This entire app was created by AI (GitHub Copilot). All gameplay and meta data used here are from <a href="https://pvpoke.com" target="_blank" rel="noopener">pvpoke.com</a>.
+    </div>
+    <div id="loginArea">
+      <span id="userInfo" style="display:none;">
+        <span id="userName"></span>
+        <img id="userAvatar" src="" alt="avatar">
+      </span>
+      <button id="loginBtn" type="button" style="display:none;">Login with Google</button>
+      <button id="logoutBtn" type="button" style="display:none;">Logout</button>
     </div>
     <h1>Pokémon Go Moveset Energy Quiz</h1>
     <div id="intro-explanation">
@@ -336,576 +1056,5 @@
       <button id="fixedNextBtn" type="button">Next Question</button>
     </span>
   </div>
-  <script>
-    // -- Meta settings (CSV file list) --
-    const metaCSVFILES = [
-      { file: "cp1500_all_overall_rankings.csv", label: "Great" },
-      { file: "cp2500_all_overall_rankings.csv", label: "Ultra" },
-      { file: "cp10000_all_overall_rankings.csv", label: "Master" },
-      { file: "cp10000_premier_overall_rankings.csv", label: "Master Premier" },
-      { file: "cp1500_tempo_overall_rankings.csv", label: "Tempo" },
-      { file: "cp1500_wasteland_overall_rankings.csv", label: "Wasteland" },
-      { file: "cp2500_battlefrontierultra_overall_rankings.csv", label: "Battlefrontier Ultra" },
-      { file: "cp10000_battlefrontiermaster_overall_rankings.csv", label: "Battlefrontier Master" },
-      { file: "cp1500_gbinvitational_overall_rankings.csv", label: "Gymbreakers Invitational" },
-      { file: "cp1500_rivalry_overall_rankings.csv", label: "Rivalry" },
-      { file: "cp1500_catch_overall_rankings.csv", label: "Catch Cup" }
-    ];
-    const githubUser = "Aeeriis";
-    const githubRepo = "GoMovesQuiz";
-    const metaRootURL = `https://raw.githubusercontent.com/${githubUser}/${githubRepo}/main/rankings/`;
-
-    let metaPokes = [];
-    let metaPreferred = {};
-    let currentMeta = localStorage.getItem("quizMeta") || metaCSVFILES[0].file;
-    let onlyHighScore = localStorage.getItem("onlyHighScore") === "true";
-    let onlyPreferredMoveset = localStorage.getItem("onlyPreferredMoveset") === "true";
-    let avoidTrickQuestions = localStorage.getItem("avoidTrickQuestions") === "true";
-
-    function populateMetaMenu() {
-      const metaSelect = document.getElementById('metaSelect');
-      metaSelect.innerHTML = "";
-      metaCSVFILES.forEach(meta => {
-        let opt = document.createElement("option");
-        opt.value = meta.file;
-        opt.textContent = meta.label;
-        metaSelect.appendChild(opt);
-      });
-      metaSelect.value = currentMeta;
-      document.getElementById('metaScore').checked = onlyHighScore;
-      document.getElementById('metaPref').checked = onlyPreferredMoveset;
-      document.getElementById('noTrick').checked = avoidTrickQuestions;
-      loadMetaAndApply();
-    }
-    document.getElementById('metaSelect').onchange = function() {
-      currentMeta = this.value;
-      localStorage.setItem("quizMeta", currentMeta);
-      loadMetaAndApply();
-    };
-    document.getElementById('metaScore').onchange = function() {
-      onlyHighScore = this.checked;
-      localStorage.setItem("onlyHighScore", onlyHighScore);
-      loadMetaAndApply();
-    };
-    document.getElementById('metaPref').onchange = function() {
-      onlyPreferredMoveset = this.checked;
-      localStorage.setItem("onlyPreferredMoveset", onlyPreferredMoveset);
-      loadMetaAndApply();
-    };
-    document.getElementById('noTrick').onchange = function() {
-      avoidTrickQuestions = this.checked;
-      localStorage.setItem("avoidTrickQuestions", avoidTrickQuestions);
-      loadMetaAndApply();
-    };
-
-    function loadMetaAndApply() {
-      document.getElementById('metaWarn').textContent = "";
-      metaPreferred = {};
-      if (!currentMeta) { metaPokes = []; return; }
-      fetch(metaRootURL + encodeURIComponent(currentMeta))
-        .then(r => r.text())
-        .then(csv => {
-          const lines = csv.trim().split(/\r?\n/);
-          if (lines.length < 2) {
-            metaPokes = [];
-            document.getElementById('metaWarn').textContent = "No Pokémon found for this meta.";
-            return;
-          }
-          const head = lines[0].split(",");
-          const idxName = head.findIndex(h => h.trim().toLowerCase() === "pokemon");
-          const idxScore = head.findIndex(h => h.trim().toLowerCase() === "score");
-          const idxFM = head.findIndex(h => h.trim().toLowerCase() === "fast move");
-          const idxC1 = head.findIndex(h => h.trim().toLowerCase() === "charged move 1");
-          const idxC2 = head.findIndex(h => h.trim().toLowerCase() === "charged move 2");
-          if (idxName === -1 || idxScore === -1) {
-            metaPokes = [];
-            document.getElementById('metaWarn').textContent = "Meta CSV missing Pokemon or Score column.";
-            return;
-          }
-          metaPokes = [];
-          metaPreferred = {};
-          lines.slice(1).forEach(rowstr => {
-            const row = rowstr.split(",");
-            const name = row[idxName];
-            const score = parseFloat(row[idxScore]);
-            if (!onlyHighScore || score > 80) {
-              metaPokes.push(name);
-            }
-            if (idxFM !== -1 && idxC1 !== -1 && idxC2 !== -1) {
-              metaPreferred[name] = {
-                fast: row[idxFM],
-                charge1: row[idxC1],
-                charge2: row[idxC2]
-              };
-            }
-          });
-          if (!metaPokes.length) {
-            document.getElementById('metaWarn').textContent = "No Pokémon with Score > 80 in this meta.";
-          }
-          newQuestion();
-        });
-    }
-
-    // Trick question detection: returns true if using this fast/charge combo always leaves energy 0 after each use
-    function isTrickCombo(fastEnergy, chargeEnergy) {
-      if (!fastEnergy || !chargeEnergy) return false;
-      return (chargeEnergy % fastEnergy === 0);
-    }
-
-    // ... timer, stats, parsing, explanation, and helpers are unchanged ...
-    let stats = JSON.parse(localStorage.getItem('quizStats') ||
-      '{"total":0,"correct":0,"sumTime":0,"sumTimeRight":0,"rightCount":0}');
-    if (stats.sumTime === undefined) stats.sumTime = 0;
-    if (stats.sumTimeRight === undefined) stats.sumTimeRight = 0;
-    if (stats.rightCount === undefined) stats.rightCount = stats.correct || 0;
-    function saveStats() {
-      localStorage.setItem('quizStats', JSON.stringify(stats));
-    }
-    function showStats() {
-      document.getElementById('stats').textContent =
-        `Score: ${stats.correct}/${stats.total} (${stats.total ? Math.round(100 * stats.correct / stats.total) : 0}%)`;
-      let avg = stats.total ? (stats.sumTime / stats.total) : 0;
-      let avgRight = stats.rightCount ? (stats.sumTimeRight / stats.rightCount) : 0;
-      document.getElementById('avgstats').textContent =
-        `Average time: ${stats.total ? avg.toFixed(2) + " s" : "-"}   |   Average for correct: ${stats.rightCount ? avgRight.toFixed(2) + " s" : "-"}`;
-    }
-    showStats();
-    // Timer logic
-    let timerStart = null, timerInterval = null, timerActive = false;
-    const timerSpan = document.getElementById('timer');
-    const timerBox = document.getElementById('timerBox');
-    const timerToggle = document.getElementById('timerToggle');
-    const timerToggleLabel = document.getElementById('timerToggleLabel');
-    let timerEnabled = localStorage.getItem('timerEnabled');
-    if (timerEnabled === null) timerEnabled = "true";
-    timerEnabled = timerEnabled === "true";
-    timerToggle.checked = timerEnabled;
-    function updateTimerVisibilityOnQuestion() {
-      timerSpan.classList.remove('timer-visible');
-      timerSpan.textContent = "";
-    }
-    function updateTimerVisibilityOnAnswer(timeText) {
-      if (timerEnabled && timeText) {
-        timerSpan.textContent = timeText;
-        timerSpan.classList.add('timer-visible');
-      } else {
-        timerSpan.classList.remove('timer-visible');
-        timerSpan.textContent = "";
-      }
-    }
-    timerToggle.onchange = function() {
-      timerEnabled = timerToggle.checked;
-      localStorage.setItem('timerEnabled', timerEnabled ? "true" : "false");
-      if (!timerEnabled) updateTimerVisibilityOnAnswer();
-    };
-    function startTimer() {
-      timerStart = Date.now();
-      timerActive = true;
-      timerSpan.classList.remove('timer-visible');
-      timerSpan.textContent = "";
-      if (timerInterval) clearInterval(timerInterval);
-    }
-    function stopTimer() {
-      if (timerInterval) clearInterval(timerInterval);
-      timerInterval = null;
-      timerActive = false;
-    }
-    function getTimerElapsed() {
-      if (!timerStart) return 0;
-      return (Date.now() - timerStart) / 1000;
-    }
-    // Difficulty logic
-    let difficulty = localStorage.getItem("quizDifficulty") || "multi";
-    document.getElementById('difficultySelect').value = difficulty;
-    document.getElementById('difficultySelect').onchange = function() {
-      difficulty = this.value;
-      localStorage.setItem("quizDifficulty", difficulty);
-      newQuestion();
-    };
-    document.getElementById('resetStats').onclick = function() {
-      stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
-      saveStats();
-      showStats();
-    };
-    function getOrdinalText(n) {
-      return ["1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th"][n-1] || (n+"th");
-    }
-    function getExplanation(pair) {
-      let fastName = pair.fast.Move;
-      let fastEnergy = pair.fast.Energy;
-      if (pair.isCombo) {
-        let chargeA = pair.combo.chargeA, nA = pair.combo.nA, chargeB = pair.charge;
-        let explanation =
-          `Each <b>${fastName}</b> (Fast) gives <b>${fastEnergy}</b> energy.<br>` +
-          `First, ${nA} <b>${chargeA.Move}</b> (Charged) are used. Each costs <b>${chargeA.Energy}</b> energy.<br>`;
-        let log = [];
-        let energy = 0, totalFasts = 0;
-        for (let i=1; i<=nA; ++i) {
-          let thisFasts = 0, startEnergy = energy;
-          let movesSoFar = [];
-          while (energy < chargeA.Energy) {
-            energy += fastEnergy;
-            totalFasts++;
-            thisFasts++;
-            movesSoFar.push(startEnergy + thisFasts * fastEnergy);
-          }
-          log.push(`For the ${getOrdinalText(i)} ${chargeA.Move}:<br>` +
-            `&nbsp;&nbsp;Start with <b>${startEnergy}</b> energy.<br>` +
-            `&nbsp;&nbsp;Each fast attack gives <b>${fastEnergy}</b> energy: <b>${movesSoFar.join(', ')}</b>.<br>` +
-            `&nbsp;&nbsp;After ${thisFasts} fast attacks you have <b>${startEnergy + thisFasts * fastEnergy}</b> energy (≥ ${chargeA.Energy} needed).<br>` +
-            `&nbsp;&nbsp;You spend ${chargeA.Energy} for the charged move, leaving <b>${startEnergy + thisFasts*fastEnergy - chargeA.Energy}</b> energy for the next.<br>`
-          );
-          energy -= chargeA.Energy;
-        }
-        let beforeB = energy;
-        let fastsForB = 0, breakdownB = [];
-        let energyB = beforeB;
-        while (energyB < chargeB.Energy) {
-          energyB += fastEnergy;
-          fastsForB++;
-          breakdownB.push(beforeB + fastsForB * fastEnergy);
-        }
-        explanation += log.join('<br>') + `<br>After those, you have <b>${beforeB}</b> energy.<br>`;
-        explanation += `Each fast attack gives <b>${fastEnergy}</b> energy: <b>${breakdownB.join(', ')}</b>.<br>`;
-        explanation += `After ${fastsForB} fast attacks you have <b>${beforeB + fastsForB*fastEnergy}</b> energy (≥ ${chargeB.Energy} needed).<br>`;
-        explanation += `You spend ${chargeB.Energy} for the charged move, leaving <b>${beforeB + fastsForB*fastEnergy - chargeB.Energy}</b> energy for the next.<br>`;
-        return explanation;
-      } else {
-        let chargeName = pair.charge.Move;
-        let chargeEnergy = pair.charge.Energy;
-        let n = pair.which;
-        let explanation = 
-          `Each <b>${fastName}</b> (Fast) gives <b>${fastEnergy}</b> energy.<br>` +
-          `You need <b>${chargeEnergy}</b> energy for each <b>${chargeName}</b> (Charged).<br>`;
-        let breakdown = [];
-        let energy = 0;
-        for (let i = 1; i <= n; i++) {
-          let thisFasts = 0;
-          let startingEnergy = energy;
-          let movesSoFar = [];
-          while (energy < chargeEnergy) {
-            energy += fastEnergy;
-            thisFasts++;
-            movesSoFar.push(startingEnergy + thisFasts * fastEnergy);
-          }
-          breakdown.push(
-            `For the ${getOrdinalText(i)} charged move:<br>` +
-            `&nbsp;&nbsp;Start with <b>${startingEnergy}</b> energy.<br>` +
-            `&nbsp;&nbsp;Each fast attack gives <b>${fastEnergy}</b> energy: <b>${movesSoFar.join(', ')}</b>.<br>` +
-            `&nbsp;&nbsp;After ${thisFasts} fast attacks you have <b>${startingEnergy + thisFasts*fastEnergy}</b> energy (≥ ${chargeEnergy} needed).<br>` +
-            `&nbsp;&nbsp;You spend ${chargeEnergy} for the charged move, leaving <b>${startingEnergy + thisFasts*fastEnergy - chargeEnergy}</b> energy for the next.<br>`
-          );
-          energy -= chargeEnergy;
-        }
-        explanation += breakdown.join('<br>');
-        return explanation;
-      }
-    }
-    let moves = [], movesByName = {}, pokedex = [], currentPair = {};
-    Promise.all([
-      fetch('moves.csv').then(r => r.text()),
-      fetch('pokemon.json').then(r => r.json())
-    ]).then(([csvData, pokeData]) => {
-      moves = parseCSV(csvData);
-      movesByName = {};
-      moves.forEach(mv => {
-        movesByName[mv.Move.trim().toUpperCase().replace(/ /g, "_")] = mv;
-        movesByName[mv.Move.trim()] = mv;
-      });
-      pokedex = pokeData;
-      document.getElementById('loading').classList.add('hidden');
-      document.getElementById('quizSection').classList.remove('hidden');
-      showStats();
-      populateMetaMenu();
-    });
-    function parseCSV(data) {
-      const lines = data.trim().split('\n');
-      const headers = lines[0].split(',').map(h => h.trim());
-      return lines.slice(1).map(line => {
-        let cells = [], cell = '', inQuotes = false;
-        for (let ch of line) {
-          if (ch === '"') inQuotes = !inQuotes;
-          else if (ch === ',' && !inQuotes) { cells.push(cell); cell = ''; }
-          else cell += ch;
-        }
-        cells.push(cell);
-        let obj = {};
-        headers.forEach((h, i) => {
-          obj[h] = cells[i] !== undefined ? cells[i].trim() : '';
-          if (['Energy'].includes(h)) {
-            obj[h] = obj[h] === '' ? NaN : parseInt(obj[h], 10);
-          }
-        });
-        return obj;
-      });
-    }
-
-    function pickEligiblePokemon() {
-      let eligible = pokedex.filter(poke => {
-        let name = poke.speciesName;
-        let fastList, chargeList;
-        if (onlyPreferredMoveset && metaPreferred[name]) {
-          fastList = [metaPreferred[name].fast].filter(mv => !!movesByName[mv]);
-          chargeList = [metaPreferred[name].charge1, metaPreferred[name].charge2].filter(mv => !!movesByName[mv]);
-        } else {
-          fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
-          chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
-        }
-        return fastList.length && chargeList.length && (!metaPokes.length || metaPokes.includes(name));
-      });
-      if (!eligible.length) return null;
-      return eligible[Math.floor(Math.random() * eligible.length)];
-    }
-
-    function getPreferredOrAllFastMoves(poke) {
-      let name = poke.speciesName;
-      if (onlyPreferredMoveset && metaPreferred[name]) {
-        let fm = metaPreferred[name].fast;
-        return [fm].filter(mv => !!movesByName[mv]);
-      }
-      return (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
-    }
-    function getPreferredOrAllChargeMoves(poke) {
-      let name = poke.speciesName;
-      if (onlyPreferredMoveset && metaPreferred[name]) {
-        let c1 = metaPreferred[name].charge1;
-        let c2 = metaPreferred[name].charge2;
-        // Remove duplicates and blanks
-        return [c1, c2].filter((mv, i, arr) => mv && arr.indexOf(mv) === i && !!movesByName[mv]);
-      }
-      return (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
-    }
-
-    function calcFastMovesForNthCharge(fastEnergy, chargeEnergy, n) {
-      let energy = 0;
-      let fastsToEachCharge = [];
-      for(let i=1; i<=n; ++i) {
-        let thisChargeFasts = 0;
-        while (energy < chargeEnergy) {
-          energy += fastEnergy;
-          thisChargeFasts++;
-        }
-        energy -= chargeEnergy;
-        fastsToEachCharge.push(thisChargeFasts);
-      }
-      return fastsToEachCharge[n-1];
-    }
-    function newQuestion() {
-      document.getElementById('result').textContent = '';
-      document.getElementById('nextQuestion').classList.add('hidden');
-      document.getElementById('userAnswer').value = '';
-      showFixedNextButton(false);
-      stopTimer();
-      updateTimerVisibilityOnQuestion();
-      if (!metaPokes.length) {
-        document.getElementById('question').textContent = "No eligible Pokémon for this meta and filter.";
-        document.getElementById('answerForm').classList.add('hidden');
-        return;
-      }
-      // --- BASIC ---
-      if (difficulty === "basic") {
-        let tries = 0, pokemon, fastList, chargeList, fast, charge;
-        do {
-          pokemon = pickEligiblePokemon();
-          if (!pokemon) break;
-          fastList = getPreferredOrAllFastMoves(pokemon);
-          chargeList = getPreferredOrAllChargeMoves(pokemon);
-          fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
-          charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
-          tries++;
-        } while (
-          avoidTrickQuestions &&
-          isTrickCombo(fast.Energy, charge.Energy) &&
-          tries < 30
-        );
-        if (!pokemon) {
-          document.getElementById('question').textContent = 'No eligible Pokémon found. Please check your data files.';
-          document.getElementById('answerForm').classList.add('hidden');
-          return;
-        }
-        let which = 1; // Always 1st
-        let nthText = getOrdinalText(which);
-        let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
-        currentPair = { fast, charge, pokemon, needed, which, nthText, isCombo: false };
-        document.getElementById('question').textContent =
-          `How many "${fast.Move}" (Fast) are needed for the 1st "${charge.Move}" (Charged) for ${pokemon.speciesName}?`;
-        document.getElementById('answerForm').classList.remove('hidden');
-        startTimer();
-        return;
-      }
-      // --- COMBO ---
-      if (difficulty === "combo") {
-        if (Math.random() < 1/3) {
-          let tries = 0, pokemon, fastList, chargeList, chargeAIdx, chargeBIdx, fast, chargeA, chargeB;
-          do {
-            let eligible = pokedex.filter(poke => {
-              let name = poke.speciesName;
-              let fList, cList;
-              if (onlyPreferredMoveset && metaPreferred[name]) {
-                fList = [metaPreferred[name].fast].filter(mv => !!movesByName[mv]);
-                cList = [metaPreferred[name].charge1, metaPreferred[name].charge2].filter(mv => !!movesByName[mv]);
-              } else {
-                fList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
-                cList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
-              }
-              return fList.length && cList.length >= 2 && (!metaPokes.length || metaPokes.includes(name));
-            });
-            if (!eligible.length) break;
-            pokemon = eligible[Math.floor(Math.random() * eligible.length)];
-            fastList = getPreferredOrAllFastMoves(pokemon);
-            chargeList = getPreferredOrAllChargeMoves(pokemon);
-            chargeAIdx = Math.floor(Math.random() * chargeList.length);
-            do { chargeBIdx = Math.floor(Math.random() * chargeList.length); } while (chargeBIdx === chargeAIdx);
-            fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
-            chargeA = movesByName[chargeList[chargeAIdx]];
-            chargeB = movesByName[chargeList[chargeBIdx]];
-            tries++;
-          } while (
-            avoidTrickQuestions &&
-            isTrickCombo(fast.Energy, chargeA.Energy) &&
-            isTrickCombo(fast.Energy, chargeB.Energy) &&
-            tries < 30
-          );
-          if (!pokemon) return newQuestion();
-          let nA = 1 + Math.floor(Math.random() * 3); // 1-3 times
-          let energy = 0, totalFasts = 0;
-          for (let i=0; i<nA; ++i) {
-            while (energy < chargeA.Energy) {
-              energy += fast.Energy;
-              totalFasts++;
-            }
-            energy -= chargeA.Energy;
-          }
-          let neededFastsForB = 0;
-          let currentEnergy = energy;
-          while (currentEnergy < chargeB.Energy) {
-            currentEnergy += fast.Energy;
-            neededFastsForB++;
-          }
-          currentPair = {
-            fast, charge: chargeB, pokemon, needed: neededFastsForB, isCombo: true,
-            combo: { chargeA, nA, leftover: energy }
-          };
-          document.getElementById('question').textContent =
-            `${pokemon.speciesName} with ${fast.Move} (Fast) has thrown ${nA} ${chargeA.Move} (Charged).` +
-            ` How many more ${fast.Move} are needed for a ${chargeB.Move} (Charged) now?`;
-          document.getElementById('answerForm').classList.remove('hidden');
-          startTimer();
-          return;
-        } else {
-          // multi-charge as fallback in combo mode
-          let tries = 0, pokemon, fastList, chargeList, fast, charge, which;
-          do {
-            pokemon = pickEligiblePokemon();
-            if (!pokemon) break;
-            fastList = getPreferredOrAllFastMoves(pokemon);
-            chargeList = getPreferredOrAllChargeMoves(pokemon);
-            fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
-            charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
-            which = 1 + Math.floor(Math.random() * 4); // 1~4
-            tries++;
-          } while (
-            avoidTrickQuestions &&
-            isTrickCombo(fast.Energy, charge.Energy) &&
-            which > 1 &&
-            tries < 30
-          );
-          if (!pokemon) {
-            document.getElementById('question').textContent = 'No eligible Pokémon found. Please check your data files.';
-            document.getElementById('answerForm').classList.add('hidden');
-            return;
-          }
-          let nthText = getOrdinalText(which);
-          let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
-          currentPair = { fast, charge, pokemon, needed, which, nthText, isCombo: false };
-          document.getElementById('question').textContent =
-            `How many "${fast.Move}" (Fast) are needed for the ${nthText} "${charge.Move}" (Charged) for ${pokemon.speciesName}?`;
-          document.getElementById('answerForm').classList.remove('hidden');
-          startTimer();
-          return;
-        }
-      }
-      // --- MULTI-CHARGE ---
-      let tries = 0, pokemon, fastList, chargeList, fast, charge, which;
-      do {
-        pokemon = pickEligiblePokemon();
-        if (!pokemon) break;
-        fastList = getPreferredOrAllFastMoves(pokemon);
-        chargeList = getPreferredOrAllChargeMoves(pokemon);
-        fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
-        charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
-        which = 1 + Math.floor(Math.random() * 4); // 1~4
-        tries++;
-      } while (
-        avoidTrickQuestions &&
-        isTrickCombo(fast.Energy, charge.Energy) &&
-        which > 1 &&
-        tries < 30
-      );
-      if (!pokemon) {
-        document.getElementById('question').textContent = 'No eligible Pokémon found. Please check your data files.';
-        document.getElementById('answerForm').classList.add('hidden');
-        return;
-      }
-      let nthText = getOrdinalText(which);
-      let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
-      currentPair = { fast, charge, pokemon, needed, which, nthText, isCombo: false };
-      document.getElementById('question').textContent =
-        `How many "${fast.Move}" (Fast) are needed for the ${nthText} "${charge.Move}" (Charged) for ${pokemon.speciesName}?`;
-      document.getElementById('answerForm').classList.remove('hidden');
-      startTimer();
-    }
-    document.getElementById('answerForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      stopTimer();
-      const userAnswer = parseInt(document.getElementById('userAnswer').value, 10);
-      let wasCorrect = false;
-      if (userAnswer === currentPair.needed) {
-        document.getElementById('result').textContent = '✅ Correct!';
-        wasCorrect = true;
-      } else {
-        document.getElementById('result').textContent =
-          `❌ Incorrect. The correct answer is ${currentPair.needed}.`;
-      }
-      let timeText = "";
-      let elapsed = 0;
-      if (timerEnabled && typeof timerStart === "number" && timerStart > 0) {
-        elapsed = getTimerElapsed();
-        timeText = "Answered in " + elapsed.toFixed(2) + " s";
-      }
-      if (typeof elapsed === "number" && elapsed > 0) {
-        stats.sumTime = (stats.sumTime || 0) + elapsed;
-        if (wasCorrect) {
-          stats.sumTimeRight = (stats.sumTimeRight || 0) + elapsed;
-          stats.rightCount = (stats.rightCount || 0) + 1;
-        }
-      }
-      updateTimerVisibilityOnAnswer(timeText);
-      if (timerEnabled && timeText) {
-        document.getElementById('result').innerHTML +=
-          `<br><span style="color:#228be6;font-weight:bold;">${timeText}</span>`;
-      }
-      document.getElementById('result').innerHTML +=
-        "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>";
-      showFixedNextButton(true);
-      stats.total++;
-      if (wasCorrect) stats.correct++;
-      saveStats();
-      showStats();
-    });
-    // Floating Next Button logic (NO close button, cannot be hidden)
-    const fixedNextWrap = document.getElementById('fixedNextWrap');
-    const fixedNextBtn = document.getElementById('fixedNextBtn');
-    function showFixedNextButton(show) {
-      if (show) fixedNextWrap.classList.add('show');
-      else fixedNextWrap.classList.remove('show');
-    }
-    fixedNextBtn.onclick = function() {
-      showFixedNextButton(false);
-      newQuestion();
-    };
-    // Hide the original Next Question button in main quiz area
-    document.getElementById('nextQuestion').style.display = "none";
-  </script>
 </body>
 </html>
