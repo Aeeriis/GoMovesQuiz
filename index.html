@@ -210,11 +210,11 @@
   <div class="container">
     <h1>Pokémon Go Moveset Energy Quiz</h1>
     <div id="intro-explanation">
-      <b>How the quiz works:</b><br>
+      <b>How the quiz works:</b>
       <ul>
-        <li><b>Basic</b> – "How many fast moves do you need for the <u>first</u> charged move?"</li>
-        <li><b>Multi-Charge</b> – "How many fast moves do you need for the <u>1st, 2nd, 3rd, or 4th</u> charged move?"</li>
-        <li><b>Combo</b> – "After using a certain number of one charged move, how many fast moves are needed for a different charged move?" (Combo mode now also includes Multi-Charge questions; combo questions are 1/3 of the total)</li>
+        <li><b>Basic</b> – How many fast moves do you need for the <u>first</u> charged move?</li>
+        <li><b>Multi-Charge</b> – How many fast moves do you need for the <u>1st, 2nd, 3rd, or 4th</u> charged move?</li>
+        <li><b>Combo</b> – After using a certain number of one charged move, how many fast moves are needed for a different charged move? (Combo mode now also includes Multi-Charge questions; combo questions are 1/3 of the total)</li>
       </ul>
       After each answer, an explanation with energy breakdown is shown to help you learn!
     </div>
@@ -237,7 +237,7 @@
       </div>
       <div id="metaWarn" style="color:#b00;font-size:0.98em;padding:0.1em 0 0.2em 0;"></div>
       <div style="font-size:0.9em;color:#888;margin-top:0.2em;">
-        <span>Metas loaded from <code>rankings/</code> folder in this project.</span>
+        <span>Metas loaded from <a href="https://github.com/Aeeriis/GoMovesQuiz/tree/main/rankings" target="_blank">GitHub rankings/</a> folder.</span>
       </div>
     </div>
     <div id="timerSettingsWrap">
@@ -274,49 +274,39 @@
     </span>
   </div>
   <script>
-    // --- Meta discovery: Load all .csv in rankings/ as metas ---
-    let metaCSVFILES = [];
+    // HARDCODE ALL YOUR META CSVs HERE (update as you add or remove files in rankings/)
+    const metaCSVFILES = [
+      "cp10000_all_overall_rankings.csv",
+      "cp10000_battlefrontiermaster_overall_rankings.csv",
+      "cp10000_premier_overall_rankings.csv",
+      "cp1500_all_overall_rankings.csv",
+      "cp1500_catch_overall_rankings.csv",
+      "cp1500_gbinvitational_overall_rankings.csv",
+      "cp1500_rivalry_overall_rankings.csv",
+      "cp1500_tempo_overall_rankings.csv",
+      "cp1500_wasteland_overall_rankings.csv",
+      "cp2500_all_overall_rankings.csv",
+      "cp2500_battlefrontierultra_overall_rankings.csv"
+      // ...add/remove as needed
+    ];
+    const githubUser = "Aeeriis";
+    const githubRepo = "GoMovesQuiz";
+    const metaRootURL = `https://raw.githubusercontent.com/${githubUser}/${githubRepo}/main/rankings/`;
+
     let metaPokes = [];
-    let currentMeta = localStorage.getItem("quizMeta") || "";
+    let currentMeta = localStorage.getItem("quizMeta") || metaCSVFILES[0];
     let onlyHighScore = localStorage.getItem("onlyHighScore") === "true";
-    function fetchMetaList() {
-      // GitHub Pages and most web servers support directory listing as JSON
-      // We'll try the GitHub API, otherwise fallback to a default list
-      fetch('rankings/')
-        .then(async r => {
-          // Try to parse as JSON (if using a dev server)
-          if (r.headers.get("content-type")?.includes("application/json")) {
-            const files = await r.json();
-            metaCSVFILES = files.filter(f => f.name.endsWith('.csv')).map(f => ({name: f.name, path: f.name}));
-          } else {
-            // Fallback: parse as HTML directory listing (for local/server)
-            const html = await r.text();
-            metaCSVFILES = Array.from(html.matchAll(/href="([^"]+\.csv)"/g))
-              .map(m => ({ name: decodeURIComponent(m[1].replace(/^.*\//,"")), path: decodeURIComponent(m[1]) }));
-          }
-          // If no metas found, show error
-          if (!metaCSVFILES.length) {
-            document.getElementById('metaWarn').textContent = "No .csv metas found in rankings/.";
-          }
-          populateMetaMenu();
-        })
-        .catch(() => {
-          document.getElementById('metaWarn').textContent = "Failed to list metas in rankings/.";
-        });
-    }
+
     function populateMetaMenu() {
       const metaSelect = document.getElementById('metaSelect');
       metaSelect.innerHTML = "";
       metaCSVFILES.forEach(meta => {
         let opt = document.createElement("option");
-        opt.value = meta.name;
-        opt.textContent = meta.name.replace(/\.csv$/,"");
+        opt.value = meta;
+        opt.textContent = meta.replace(/\.csv$/,"");
         metaSelect.appendChild(opt);
       });
-      // restore last used
-      let toSelect = metaCSVFILES.find(m => m.name === currentMeta) ? currentMeta : (metaCSVFILES[0]?.name || "");
-      metaSelect.value = toSelect;
-      currentMeta = toSelect;
+      metaSelect.value = currentMeta;
       document.getElementById('metaScore').checked = onlyHighScore;
       loadMetaAndApply();
     }
@@ -332,8 +322,8 @@
     };
     function loadMetaAndApply() {
       document.getElementById('metaWarn').textContent = "";
-      if (!metaCSVFILES.length || !currentMeta) { metaPokes = []; return; }
-      fetch('rankings/' + encodeURIComponent(currentMeta))
+      if (!currentMeta) { metaPokes = []; return; }
+      fetch(metaRootURL + encodeURIComponent(currentMeta))
         .then(r => r.text())
         .then(csv => {
           const lines = csv.trim().split(/\r?\n/);
@@ -435,11 +425,9 @@
       saveStats();
       showStats();
     };
-    // Helper: get ordinal text for numbers
     function getOrdinalText(n) {
       return ["1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th"][n-1] || (n+"th");
     }
-    // Explanation function (same as before, omitted for brevity)
     function getExplanation(pair) {
       let fastName = pair.fast.Move;
       let fastEnergy = pair.fast.Energy;
@@ -511,9 +499,7 @@
         return explanation;
       }
     }
-    // Quiz logic
     let moves = [], movesByName = {}, pokedex = [], currentPair = {};
-    // Fetch moves.csv and pokemon.json automatically
     Promise.all([
       fetch('moves.csv').then(r => r.text()),
       fetch('pokemon.json').then(r => r.json())
@@ -528,7 +514,7 @@
       document.getElementById('loading').classList.add('hidden');
       document.getElementById('quizSection').classList.remove('hidden');
       showStats();
-      fetchMetaList();
+      populateMetaMenu();
     });
     function parseCSV(data) {
       const lines = data.trim().split('\n');
@@ -748,7 +734,6 @@
       floatingNextManuallyClosed = true;
       showFixedNextButton(false);
     };
-    // Hide the original Next Question button in main quiz area
     document.getElementById('nextQuestion').style.display = "none";
   </script>
 </body>
