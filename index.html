@@ -252,6 +252,49 @@
       display: none;
       animation: pop-in 0.85s cubic-bezier(.4,2,.3,1);
     }
+    #levelUpRewardBox {
+      display: none;
+      background: #fffbe7;
+      border: 2px solid #ffe066;
+      border-radius: 12px;
+      margin-top: 1em;
+      margin-bottom: 0.7em;
+      padding: 1em 1.1em 1em 1.1em;
+      box-shadow: 0 2px 16px #ffe06633;
+      text-align: center;
+      font-size: 1.18em;
+      position: relative;
+      z-index: 101;
+      animation: pop-in 0.85s cubic-bezier(.4,2,.3,1);
+    }
+    #levelUpRewardFruits {
+      margin-top: 0.4em;
+      margin-bottom: 0.3em;
+      font-size: 1.25em;
+      display: flex;
+      gap: 0.7em;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .fruit-reward {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 1em;
+      margin: 0 0.15em;
+      min-width: 60px;
+    }
+    .fruit-reward-emoji {
+      font-size: 2em;
+      filter: drop-shadow(0 1.5px 0 #ffe06655);
+    }
+    .fruit-reward-label {
+      font-size: 1em;
+      margin-top: 0.1em;
+      color: #964700;
+      font-weight: bold;
+      text-shadow: 0 1px 0 #fff6d6;
+    }
     @keyframes pop-in {
       0% { transform: scale(1.6); opacity: 0; }
       30% { transform: scale(1.13); opacity: 1;}
@@ -283,9 +326,71 @@
       #metaScoreExplain, #metaPrefExplain, #noTrickExplain { font-size: 0.88em; padding-left: 0.3em; }
       .disclaimer { font-size: 0.95em; padding: 0.56em 0.7em; }
       .copyright { font-size: 0.78em; }
+      #levelUpRewardBox { font-size: 1em; }
+      #levelUpRewardFruits { font-size: 1em; }
+      .fruit-reward-emoji { font-size: 1.5em;}
+      .fruit-reward-label { font-size: 0.92em;}
     }
   </style>
   <script type="module">
+
+    // --- LEVEL-UP REWARDS DATA ---
+    // emoji from https://emojipedia.org/
+    const FRUITS = [
+      { name: "Apple", emoji: "🍎", tier: "Common", chance: 10 },
+      { name: "Banana", emoji: "🍌", tier: "Common", chance: 10 },
+      { name: "Orange", emoji: "🍊", tier: "Common", chance: 10 },
+      { name: "Grapes", emoji: "🍇", tier: "Common", chance: 10 },
+      { name: "Watermelon", emoji: "🍉", tier: "Common", chance: 10 },
+      { name: "Kiwi", emoji: "🥝", tier: "Uncommon", chance: 5 },
+      { name: "Pomegranate", emoji: "🍈", tier: "Uncommon", chance: 5 },
+      { name: "Mango", emoji: "🥭", tier: "Uncommon", chance: 5 },
+      { name: "Pear", emoji: "🍐", tier: "Uncommon", chance: 5 },
+      { name: "Blueberries", emoji: "🫐", tier: "Uncommon", chance: 5 },
+      { name: "Dragon fruit", emoji: "🐉🍉", tier: "Rare", chance: 3 },
+      { name: "Passion fruit", emoji: "🟣🍈", tier: "Rare", chance: 3 },
+      { name: "Starfruit", emoji: "🌟🍈", tier: "Rare", chance: 3 },
+      { name: "Lychee", emoji: "🍒🍈", tier: "Rare", chance: 3 },
+      { name: "Persimmon", emoji: "🧡🍈", tier: "Rare", chance: 3 },
+      { name: "Mangosteen", emoji: "🟣🥭", tier: "Epic", chance: 2 },
+      { name: "Rambutan", emoji: "🦔🍈", tier: "Epic", chance: 2 },
+      { name: "Buddha’s Hand", emoji: "🟡🤲", tier: "Epic", chance: 2 },
+      { name: "Salak", emoji: "🦞🍈", tier: "Epic", chance: 2 },
+      { name: "Miracle Fruit", emoji: "✨🍒", tier: "Legendary", chance: 0.67 },
+      { name: "Durian", emoji: "🟩🥥", tier: "Legendary", chance: 0.67 },
+      { name: "Cupuaçu", emoji: "🥥🍫", tier: "Legendary", chance: 0.66 }
+    ];
+    // --- Precompute cumulative ranges for random draw
+    function buildFruitTable() {
+      let table = [];
+      let acc = 0;
+      for (const fruit of FRUITS) {
+        acc += fruit.chance;
+        table.push({ ...fruit, max: acc });
+      }
+      return { table, total: acc };
+    }
+    const { table: FRUIT_TABLE, total: FRUIT_TOTAL } = buildFruitTable();
+
+    function getRandomFruit() {
+      const rand = Math.random() * FRUIT_TOTAL;
+      return FRUIT_TABLE.find(fruit => rand < fruit.max);
+    }
+
+    // Store earned fruits in localStorage
+    function getEarnedFruits() {
+      try {
+        const arr = JSON.parse(localStorage.getItem("earnedFruits") || "[]");
+        if (!Array.isArray(arr)) return [];
+        return arr;
+      } catch (e) { return []; }
+    }
+    function addEarnedFruits(fruits) {
+      const arr = getEarnedFruits();
+      arr.push(...fruits);
+      localStorage.setItem("earnedFruits", JSON.stringify(arr));
+    }
+
     // ---- XP/LEVEL SYSTEM ----
     function getLevelAndNextXP(xp) {
       let thresholds = [0];
@@ -321,7 +426,7 @@
       if (isCorrect && typeof elapsed === "number" && elapsed > 0 && elapsed < 5) xp += xpSpeed;
       return xp;
     }
-    function animateXPBar(fromXP, toXP) {
+    function animateXPBar(fromXP, toXP, cb) {
       const bar = document.getElementById('levelXPBarInner');
       const xpText = document.getElementById('levelXPText');
       let start = null, duration = 600;
@@ -340,6 +445,7 @@
         else {
           setLevelUI(toXP);
           setTimeout(()=>{document.getElementById('levelUPMsg').style.display="none";}, 1600);
+          if (cb) cb();
         }
       }
       requestAnimationFrame(step);
@@ -352,18 +458,33 @@
       document.getElementById('levelXPBarInner').style.width = (100*frac).toFixed(1)+"%";
       document.getElementById('levelUPMsg').style.display = "none";
     }
-    // ---- END XP/LEVEL SYSTEM ----
+
+    // --- LEVEL UP REWARD UI ---
+    function showLevelUpReward(fruits) {
+      const box = document.getElementById('levelUpRewardBox');
+      const fruitsDiv = document.getElementById('levelUpRewardFruits');
+      fruitsDiv.innerHTML = '';
+      fruits.forEach(fruit=>{
+        let el = document.createElement('span');
+        el.className = 'fruit-reward';
+        el.innerHTML = `<span class="fruit-reward-emoji">${fruit.emoji}</span><span class="fruit-reward-label">${fruit.name}</span>`;
+        fruitsDiv.appendChild(el);
+      });
+      box.style.display = '';
+      box.querySelector('#levelUpRewardMsg').textContent = `Level Up Reward${fruits.length>1?'s':''}!`;
+      setTimeout(() => { box.style.display = 'none'; }, 4200);
+    }
 
     window.addEventListener('DOMContentLoaded', () => {
       // --- STATS (localStorage) ---
       let stats = {
-        total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0, xp: 0
+        total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0, xp: 0, level: 1
       };
       function loadStats() {
         try {
           let s = JSON.parse(localStorage.getItem("quizStats") || "{}");
           stats = Object.assign({
-            total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0, xp: 0
+            total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0, xp: 0, level: 1
           }, s);
         } catch(e) { /* ignore */ }
         showStats();
@@ -382,13 +503,14 @@
       }
       document.getElementById('resetStats').onclick = function() {
         if (confirm("Are you sure you want to reset your stats? This cannot be undone.")) {
-          stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0, xp: 0 };
+          stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0, xp: 0, level: 1 };
           saveStats();
           showStats();
         }
       };
 
-      // ---- QUIZ LOGIC ----
+      // ---- QUIZ LOGIC (unchanged, except XP/level) ----
+      // Meta CSVs
       const metaCSVFILES = [
         { file: "cp1500_all_overall_rankings.csv", label: "Great" },
         { file: "cp2500_all_overall_rankings.csv", label: "Ultra" },
@@ -902,9 +1024,23 @@
           timeText = "Answered in " + elapsed.toFixed(2) + " s";
         }
         let oldXP = stats.xp || 0;
+        let oldLevel = getLevelAndNextXP(oldXP).level;
         let xpGain = getXPForAnswer(wasCorrect, elapsed, difficulty, onlyHighScore);
         stats.xp = (stats.xp||0) + xpGain;
+        let newLevel = getLevelAndNextXP(stats.xp).level;
         animateXPBar(oldXP, stats.xp);
+
+        // Level up reward logic
+        if (newLevel > oldLevel) {
+          let nLevelUps = newLevel - oldLevel;
+          let fruits = [];
+          for (let i=0; i<nLevelUps; ++i) {
+            fruits.push(getRandomFruit());
+          }
+          addEarnedFruits(fruits);
+          setTimeout(()=>showLevelUpReward(fruits), 600);
+        }
+        stats.level = newLevel;
 
         stats.total = (stats.total || 0) + 1;
         stats.sumTime = (stats.sumTime || 0) + (elapsed || 0);
@@ -954,6 +1090,11 @@
       <span id="levelXPText">XP: 0 / 100</span>
       <div id="levelXPBar"><div id="levelXPBarInner"></div></div>
       <div id="levelUPMsg">Level Up!</div>
+    </div>
+    <div id="levelUpRewardBox">
+      <div id="levelUpRewardMsg" style="font-size:1.13em;color:#b47a00;font-weight:bold;">Level Up Reward!</div>
+      <div id="levelUpRewardFruits"></div>
+      <div style="font-size:0.97em;color:#888;">Check your collection in a future update!</div>
     </div>
     <div id="intro-explanation">
       <b>How the quiz works:</b>
