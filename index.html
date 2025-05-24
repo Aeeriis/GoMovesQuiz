@@ -54,6 +54,14 @@
       margin-right: 0.4em;
       accent-color: #228be6;
     }
+    #metaScoreExplain {
+      font-size: 0.93em;
+      color: #234;
+      margin-top: 0.18em;
+      margin-bottom: 0.15em;
+      line-height: 1.35;
+      padding-left: 2.1em;
+    }
     #intro-explanation { margin: 1.1em 0 0.7em 0; background: #f0f7ff; border-radius: 8px; padding: 0.8em; font-size: 1.07em; color: #234; }
     #fixedNextWrap {
       display: none;
@@ -92,26 +100,6 @@
       background: #1864ab;
       color: #fff;
       border-color: #1864ab;
-    }
-    #fixedNextWrap .close-next-btn {
-      background: none;
-      border: none;
-      font-size: 1.5em;
-      color: #888;
-      cursor: pointer;
-      position: absolute;
-      right: 0.2em;
-      top: -0.9em;
-      pointer-events: auto;
-      z-index: 3;
-      padding: 0;
-      line-height: 1;
-      opacity: 0.7;
-      transition: color .18s, opacity .15s;
-    }
-    #fixedNextWrap .close-next-btn:hover {
-      color: #228be6;
-      opacity: 1;
     }
     #fixedNextBtnWrap {
       display: inline-block;
@@ -203,6 +191,7 @@
       #timerBox { font-size: 1em; gap: 0.7em; }
       #timerToggleLabel { font-size: 1em; }
       #fixedNextBtn { margin-bottom: 2em; }
+      #metaScoreExplain { font-size: 0.88em; padding-left: 0.3em; }
     }
   </style>
 </head>
@@ -234,6 +223,11 @@
           <input type="checkbox" id="metaScore" />
           Only Score &gt; 80
         </label>
+      </div>
+      <div id="metaScoreExplain">
+        <b>What does "Score &gt; 80" mean?</b><br>
+        This limits the Pokémon pool to only those with an <b>overall score above 80 in the selected meta on <a href="https://pvpoke.com" target="_blank" rel="noopener">pvpoke.com</a></b>.<br>
+        Higher overall score means the Pokémon is more competitively viable in that meta.
       </div>
       <div id="metaWarn" style="color:#b00;font-size:0.98em;padding:0.1em 0 0.2em 0;"></div>
       <div style="font-size:0.9em;color:#888;margin-top:0.2em;">
@@ -270,7 +264,7 @@
   <div id="fixedNextWrap">
     <span id="fixedNextBtnWrap">
       <button id="fixedNextBtn" type="button">Next Question</button>
-      <button id="closeNextBtn" class="close-next-btn" title="Hide Next Question button" aria-label="Hide Next Question">&times;</button>
+      <!-- The close button is removed to make the Next Question button uncloseable -->
     </span>
   </div>
   <script>
@@ -563,7 +557,6 @@
       document.getElementById('result').textContent = '';
       document.getElementById('nextQuestion').classList.add('hidden');
       document.getElementById('userAnswer').value = '';
-      floatingNextManuallyClosed = false;
       showFixedNextButton(false);
       stopTimer();
       updateTimerVisibilityOnQuestion();
@@ -714,25 +707,18 @@
       saveStats();
       showStats();
     });
-    // Floating Next Button logic
+    // Floating Next Button logic (NO close button, cannot be hidden)
     const fixedNextWrap = document.getElementById('fixedNextWrap');
     const fixedNextBtn = document.getElementById('fixedNextBtn');
-    const closeNextBtn = document.getElementById('closeNextBtn');
-    let floatingNextManuallyClosed = false;
     function showFixedNextButton(show) {
-      if (show && !floatingNextManuallyClosed) fixedNextWrap.classList.add('show');
+      if (show) fixedNextWrap.classList.add('show');
       else fixedNextWrap.classList.remove('show');
     }
     fixedNextBtn.onclick = function() {
-      floatingNextManuallyClosed = false;
       showFixedNextButton(false);
       newQuestion();
     };
-    closeNextBtn.onclick = function(e) {
-      e.stopPropagation();
-      floatingNextManuallyClosed = true;
-      showFixedNextButton(false);
-    };
+    // Hide the original Next Question button in main quiz area
     document.getElementById('nextQuestion').style.display = "none";
   </script>
 </body>
