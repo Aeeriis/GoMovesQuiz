@@ -369,9 +369,9 @@
       { emoji: "🍫", name: "Cupuaçu",      rarity: "🔴 Legendary", prob: 0.66, rarityKey: "Legendary" }
     ];
     function calcXP(difficulty, onlyHighScore) {
-      let base = 7;
-      if (difficulty === "multi") base = 12;
-      else if (difficulty === "combo") base = 18;
+      let base = 5;
+      if (difficulty === "multi") base = 9;
+      else if (difficulty === "combo") base = 14;
       if (onlyHighScore) base = Math.round(base * 0.67);
       return base;
     }
@@ -392,8 +392,9 @@
       }
       return LEVELUP_REWARDS[0];
     }
-    let xpState = JSON.parse(localStorage.getItem('quizXP') || '{"xp":0,"fruitBag":{}}');
+    let xpState = JSON.parse(localStorage.getItem('quizXP') || '{"xp":0,"fruitBag":{}, "answeredQuestions":{}}');
     if (!xpState.fruitBag) xpState.fruitBag = {};
+    if (!xpState.answeredQuestions) xpState.answeredQuestions = {};
     function saveXP() { localStorage.setItem('quizXP', JSON.stringify(xpState)); }
     function showXP() {
       const info = getLevelInfo(xpState.xp);
@@ -433,6 +434,89 @@
         `<b>Level Up!</b> You received a <b>${fruit.rarity} ${fruit.name}</b>!`;
       setTimeout(() => { div.textContent = ""; }, 5500);
     }
+    // --- Prevent XP farming by "Check" on same question ---
+    function getQuestionHash(pair) {
+      if (!pair) return "";
+      let key = [
+        pair.pokemon && pair.pokemon.speciesName,
+        pair.fast && pair.fast.Move,
+        pair.charge && pair.charge.Move,
+        pair.which,
+        pair.isCombo,
+        pair.combo ? (pair.combo.chargeA && pair.combo.chargeA.Move) : "",
+        pair.combo ? pair.combo.nA : ""
+      ].join("|");
+      return btoa(unescape(encodeURIComponent(key)));
+    }
+    // ...[rest of your quiz/game script is unchanged]...
+    // (but replace your answerForm submit handler with the following)
+
+    document.getElementById('answerForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      stopTimer();
+      const userAnswer = parseInt(document.getElementById('userAnswer').value, 10);
+      let wasCorrect = false;
+      if (userAnswer === currentPair.needed) {
+        document.getElementById('result').textContent = '✅ Correct!';
+        wasCorrect = true;
+      } else {
+        document.getElementById('result').textContent =
+          `❌ Incorrect. The correct answer is ${currentPair.needed}.`;
+      }
+      let timeText = "";
+      let elapsed = 0;
+      if (timerEnabled && typeof timerStart === "number" && timerStart > 0) {
+        elapsed = getTimerElapsed();
+        timeText = "Answered in " + elapsed.toFixed(2) + " s";
+      }
+      if (typeof elapsed === "number" && elapsed > 0) {
+        stats.sumTime = (stats.sumTime || 0) + elapsed;
+        if (wasCorrect) {
+          stats.sumTimeRight = (stats.sumTimeRight || 0) + elapsed;
+          stats.rightCount = (stats.rightCount || 0) + 1;
+        }
+      }
+      updateTimerVisibilityOnAnswer(timeText);
+      if (timerEnabled && timeText) {
+        document.getElementById('result').innerHTML +=
+          `<br><span style="color:#228be6;font-weight:bold;">${timeText}</span>`;
+      }
+      document.getElementById('result').innerHTML +=
+        "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>";
+      showFixedNextButton(true);
+      stats.total++;
+      if (wasCorrect) stats.correct++;
+      saveStats();
+      showStats();
+
+      // --- XP LOGIC WITH ANTI-FARMING ---
+      if (wasCorrect) {
+        const qHash = getQuestionHash(currentPair);
+        if (!xpState.answeredQuestions) xpState.answeredQuestions = {};
+        if (!xpState.answeredQuestions[qHash]) {
+          const xpGain = calcXP(difficulty, onlyHighScore);
+          let prevXP = xpState.xp;
+          xpState.xp += xpGain;
+          xpState.answeredQuestions[qHash] = true;
+          let prevLevel = getLevelInfo(prevXP).level;
+          let newLevel = getLevelInfo(xpState.xp).level;
+          saveXP();
+          showXP();
+          if (newLevel > prevLevel) {
+            let fruit = getRandomFruitReward();
+            if (!xpState.fruitBag[fruit.emoji]) xpState.fruitBag[fruit.emoji] = 0;
+            xpState.fruitBag[fruit.emoji]++;
+            saveXP();
+            showXP();
+            showLevelupReward(fruit);
+          } else {
+            showLevelupReward(null);
+          }
+        } else {
+          showLevelupReward(null);
+        }
+      }
+    });
     // -- Meta settings (CSV file list) --
     const metaCSVFILES = [
       { file: "cp1500_all_overall_rankings.csv", label: "Great" },
