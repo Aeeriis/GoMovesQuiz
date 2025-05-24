@@ -51,14 +51,65 @@
       align-items: center;
       gap: 1em;
       user-select: none;
+      justify-content: flex-start;
+    }
+    #timer {
+      min-width: 6em;
+      font-weight: bold;
+      display: inline-block;
+      text-align: left;
+      visibility: hidden;
+      transition: opacity 0.2s;
+    }
+    .timer-visible {
+      visibility: visible !important;
+    }
+    /* Toggle Switch Styling */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 46px;
+      height: 28px;
+      vertical-align: middle;
+      margin-right: 0.6em;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #ccc;
+      transition: .3s;
+      border-radius: 34px;
+      border: 2.5px solid #bbb;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 2.7px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px #0001;
+    }
+    input:checked + .slider {
+      background-color: #228be6;
+      border-color: #228be6;
+    }
+    input:checked + .slider:before {
+      transform: translateX(17px);
     }
     #timerToggleLabel {
       font-size: 0.97em;
       user-select: none;
       cursor: pointer;
-    }
-    #timer {
-      display: none;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      margin-left: 0.4em;
     }
     @media (max-width: 600px) {
       h1 { font-size: 1.2em; }
@@ -67,6 +118,7 @@
       #fixedNextBtn { font-size: 1em; padding: 0.7em 1.5em; }
       #fixedNextWrap { padding-bottom: 1.4em; }
       #timerBox { font-size: 0.95em; gap: 0.7em; }
+      #timerToggleLabel { font-size: 0.95em; }
     }
   </style>
 </head>
@@ -91,9 +143,12 @@
       </select>
     </div>
     <div id="timerBox">
-      <span id="timer" style="min-width:6em;display:none;"></span>
+      <span id="timer"></span>
       <label id="timerToggleLabel">
-        <input type="checkbox" id="timerToggle" style="vertical-align:middle;margin-right:0.2em;">
+        <span class="switch">
+          <input type="checkbox" id="timerToggle">
+          <span class="slider"></span>
+        </span>
         Show time
       </label>
     </div>
@@ -139,24 +194,32 @@
     timerEnabled = timerEnabled === "true";
     timerToggle.checked = timerEnabled;
 
-    // Always hide timer until answer is submitted
+    // Timer always hidden until answer is submitted, is always on the left
     function updateTimerVisibilityOnQuestion() {
-      timerSpan.style.display = "none";
+      timerSpan.classList.remove('timer-visible');
+      timerSpan.textContent = "";
     }
-    function updateTimerVisibilityOnAnswer() {
-      if (timerEnabled) timerSpan.style.display = "inline-block";
-      else timerSpan.style.display = "none";
+    function updateTimerVisibilityOnAnswer(timeText) {
+      if (timerEnabled && timeText) {
+        timerSpan.textContent = timeText;
+        timerSpan.classList.add('timer-visible');
+      } else {
+        timerSpan.classList.remove('timer-visible');
+        timerSpan.textContent = "";
+      }
     }
     timerToggle.onchange = function() {
       timerEnabled = timerToggle.checked;
       localStorage.setItem('timerEnabled', timerEnabled ? "true" : "false");
+      // Clear timer display if turned off after answering
+      if (!timerEnabled) updateTimerVisibilityOnAnswer();
     };
 
     function startTimer() {
       timerStart = Date.now();
       timerActive = true;
-      // Don't show timer while answering
-      timerSpan.style.display = "none";
+      timerSpan.classList.remove('timer-visible');
+      timerSpan.textContent = "";
       if (timerInterval) clearInterval(timerInterval);
     }
     function stopTimer() {
@@ -484,11 +547,15 @@
           `❌ Incorrect. The correct answer is ${currentPair.needed}.`;
       }
       // Show the timer result if enabled and timer was running
-      updateTimerVisibilityOnAnswer();
+      let timeText = "";
       if (timerEnabled && typeof timerStart === "number" && timerStart > 0) {
         let elapsed = getTimerElapsed();
+        timeText = "Answered in " + elapsed.toFixed(2) + " s";
+      }
+      updateTimerVisibilityOnAnswer(timeText);
+      if (timerEnabled && timeText) {
         document.getElementById('result').innerHTML +=
-          `<br><span style="color:#228be6;font-weight:bold;">Answered in ${elapsed.toFixed(2)} s</span>`;
+          `<br><span style="color:#228be6;font-weight:bold;">${timeText}</span>`;
       }
       document.getElementById('result').innerHTML +=
         "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>";
