@@ -57,6 +57,9 @@
       user-select: none;
       cursor: pointer;
     }
+    #timer {
+      display: none;
+    }
     @media (max-width: 600px) {
       h1 { font-size: 1.2em; }
       .container { padding: 0.5em; }
@@ -88,10 +91,10 @@
       </select>
     </div>
     <div id="timerBox">
-      <span id="timer" style="min-width:6em;display:inline-block;"></span>
+      <span id="timer" style="min-width:6em;display:none;"></span>
       <label id="timerToggleLabel">
         <input type="checkbox" id="timerToggle" style="vertical-align:middle;margin-right:0.2em;">
-        Show timer
+        Show time
       </label>
     </div>
     <div id="stats"></div>
@@ -135,40 +138,31 @@
     if (timerEnabled === null) timerEnabled = "true";
     timerEnabled = timerEnabled === "true";
     timerToggle.checked = timerEnabled;
-    updateTimerVisibility();
 
+    // Always hide timer until answer is submitted
+    function updateTimerVisibilityOnQuestion() {
+      timerSpan.style.display = "none";
+    }
+    function updateTimerVisibilityOnAnswer() {
+      if (timerEnabled) timerSpan.style.display = "inline-block";
+      else timerSpan.style.display = "none";
+    }
     timerToggle.onchange = function() {
       timerEnabled = timerToggle.checked;
       localStorage.setItem('timerEnabled', timerEnabled ? "true" : "false");
-      updateTimerVisibility();
     };
-    function updateTimerVisibility() {
-      if (timerEnabled) {
-        timerSpan.style.visibility = "visible";
-      } else {
-        timerSpan.style.visibility = "hidden";
-      }
-    }
+
     function startTimer() {
-      if (!timerEnabled) { timerSpan.textContent = ""; timerActive = false; return; }
       timerStart = Date.now();
-      timerSpan.textContent = "0.00 s";
       timerActive = true;
-      timerInterval = setInterval(() => {
-        if (!timerActive) return;
-        let elapsed = (Date.now() - timerStart) / 1000;
-        timerSpan.textContent = elapsed.toFixed(2) + " s";
-      }, 60);
+      // Don't show timer while answering
+      timerSpan.style.display = "none";
+      if (timerInterval) clearInterval(timerInterval);
     }
-    function stopTimer(showFinal=true) {
+    function stopTimer() {
       if (timerInterval) clearInterval(timerInterval);
       timerInterval = null;
-      if (!timerEnabled) { timerSpan.textContent = ""; return; }
       timerActive = false;
-      if (showFinal && timerStart) {
-        let elapsed = (Date.now() - timerStart) / 1000;
-        timerSpan.textContent = elapsed.toFixed(2) + " s";
-      }
     }
     function getTimerElapsed() {
       if (!timerStart) return 0;
@@ -362,7 +356,8 @@
       document.getElementById('nextQuestion').classList.add('hidden');
       document.getElementById('userAnswer').value = '';
       showFixedNextButton(false);
-      stopTimer(false);
+      stopTimer();
+      updateTimerVisibilityOnQuestion();
 
       if (difficulty === "basic") {
         // Only ask for first charged move
@@ -489,6 +484,7 @@
           `❌ Incorrect. The correct answer is ${currentPair.needed}.`;
       }
       // Show the timer result if enabled and timer was running
+      updateTimerVisibilityOnAnswer();
       if (timerEnabled && typeof timerStart === "number" && timerStart > 0) {
         let elapsed = getTimerElapsed();
         document.getElementById('result').innerHTML +=
