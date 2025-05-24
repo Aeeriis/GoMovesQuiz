@@ -16,6 +16,7 @@
     label { font-size: 1.1em; }
     #question { font-size: 1.15em; margin-bottom: 1em; }
     #stats { font-size: 1.1em; margin: 0.8em 0; }
+    #avgstats { font-size: 1em; margin: 0.2em 0 0.8em 0; color: #234;}
     #difficultySelect, #timerToggle { font-size: 1em; margin-bottom: 1em;}
     #difficultyWrap { margin-bottom: 0.2em; }
     #intro-explanation { margin: 1.1em 0 0.7em 0; background: #f0f7ff; border-radius: 8px; padding: 0.8em; font-size: 1.07em; color: #234; }
@@ -52,7 +53,7 @@
     #timerBox {
       font-size: 1.08em;
       color: #333;
-      margin: 0; /* keep tight under toggle */
+      margin: 0;
       margin-bottom: 0.8em;
       display: flex;
       align-items: center;
@@ -129,6 +130,7 @@
       #fixedNextWrap { padding-bottom: 1.4em; }
       #timerBox { font-size: 1em; gap: 0.7em; }
       #timerToggleLabel { font-size: 1em; }
+      #avgstats { font-size: 0.95em; }
     }
   </style>
 </head>
@@ -165,6 +167,7 @@
       </div>
     </div>
     <div id="stats"></div>
+    <div id="avgstats"></div>
     <div id="loading">Loading data...</div>
     <div class="quiz-section hidden" id="quizSection">
       <div id="question"></div>
@@ -184,13 +187,22 @@
   </div>
   <script>
     // Stats logic (localStorage)
-    let stats = JSON.parse(localStorage.getItem('quizStats') || '{"total":0,"correct":0}');
+    let stats = JSON.parse(localStorage.getItem('quizStats') ||
+      '{"total":0,"correct":0,"sumTime":0,"sumTimeRight":0,"rightCount":0}');
+    if (stats.sumTime === undefined) stats.sumTime = 0;
+    if (stats.sumTimeRight === undefined) stats.sumTimeRight = 0;
+    if (stats.rightCount === undefined) stats.rightCount = stats.correct || 0;
+
     function saveStats() {
       localStorage.setItem('quizStats', JSON.stringify(stats));
     }
     function showStats() {
       document.getElementById('stats').textContent =
         `Score: ${stats.correct}/${stats.total} (${stats.total ? Math.round(100 * stats.correct / stats.total) : 0}%)`;
+      let avg = stats.total ? (stats.sumTime / stats.total) : 0;
+      let avgRight = stats.rightCount ? (stats.sumTimeRight / stats.rightCount) : 0;
+      document.getElementById('avgstats').textContent =
+        `Average time: ${stats.total ? avg.toFixed(2) + " s" : "-"}   |   Average for correct: ${stats.rightCount ? avgRight.toFixed(2) + " s" : "-"}`;
     }
     showStats();
 
@@ -254,7 +266,7 @@
     };
 
     document.getElementById('resetStats').onclick = function() {
-      stats = { total: 0, correct: 0 };
+      stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
       saveStats();
       showStats();
     };
@@ -560,9 +572,18 @@
       }
       // Show the timer result if enabled and timer was running
       let timeText = "";
+      let elapsed = 0;
       if (timerEnabled && typeof timerStart === "number" && timerStart > 0) {
-        let elapsed = getTimerElapsed();
+        elapsed = getTimerElapsed();
         timeText = "Answered in " + elapsed.toFixed(2) + " s";
+      }
+      // Update stats for average time
+      if (typeof elapsed === "number" && elapsed > 0) {
+        stats.sumTime = (stats.sumTime || 0) + elapsed;
+        if (wasCorrect) {
+          stats.sumTimeRight = (stats.sumTimeRight || 0) + elapsed;
+          stats.rightCount = (stats.rightCount || 0) + 1;
+        }
       }
       updateTimerVisibilityOnAnswer(timeText);
       if (timerEnabled && timeText) {
