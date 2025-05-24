@@ -2,14 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Pokémon Go Moveset Quiz</title>
+  <title>Pokémon Go Moveset Energy Quiz</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <link rel="manifest" href="manifest.json">
   <style>
     body { font-family: Arial, sans-serif; margin: 0; background: #fafaff; }
     .container { max-width: 480px; margin: auto; padding: 1em; }
     h1 { font-size: 1.6em; }
-    ol { padding-left: 1.3em; }
     .quiz-section { margin-top: 2em; }
     .result { margin-top: 1em; font-weight: bold; }
     input[type="number"] { width: 90%; font-size: 1.2em; }
@@ -20,10 +19,36 @@
     #difficultySelect { font-size: 1em; margin-bottom: 1em;}
     #difficultyWrap { margin-bottom: 1em; }
     #intro-explanation { margin: 1.1em 0 0.7em 0; background: #f0f7ff; border-radius: 8px; padding: 0.8em; font-size: 1.07em; color: #234; }
+    #fixedNextWrap {
+      display: none;
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: rgba(250,250,255,0.92);
+      z-index: 100;
+      text-align: center;
+      padding: 0.7em 0.2em 0.9em 0.2em;
+      box-shadow: 0 -2px 8px #bbb6;
+      border-top: 1px solid #dde;
+    }
+    #fixedNextWrap.show {
+      display: block;
+    }
+    #fixedNextBtn {
+      font-size: 1.1em;
+      padding: 0.7em 2em;
+      background: #228be6;
+      color: white;
+      border: none;
+      border-radius: 7px;
+      box-shadow: 0 2px 6px #0001;
+      cursor: pointer;
+    }
     @media (max-width: 600px) {
       h1 { font-size: 1.2em; }
       .container { padding: 0.5em; }
       #intro-explanation { font-size: 0.97em; }
+      #fixedNextBtn { font-size: 1em; padding: 0.7em 1.5em; }
+      #fixedNextWrap { padding-bottom: 1.4em; }
     }
   </style>
 </head>
@@ -57,9 +82,13 @@
         <button type="submit">Check</button>
       </form>
       <div class="result" id="result"></div>
-      <button id="nextQuestion" class="hidden">Next Question</button>
+      <button id="nextQuestion" class="hidden" style="display:none;">Next Question</button>
       <button id="resetStats" style="margin-top:1em;">Reset Stats</button>
     </div>
+  </div>
+  <!-- Fixed Next Question button at the bottom -->
+  <div id="fixedNextWrap">
+    <button id="fixedNextBtn" type="button">Next Question</button>
   </div>
   <script>
     // Stats logic (localStorage)
@@ -174,6 +203,18 @@
     let pokedex = [];
     let currentPair = {};
 
+    // Fixed Next Button
+    const fixedNextWrap = document.getElementById('fixedNextWrap');
+    const fixedNextBtn = document.getElementById('fixedNextBtn');
+    function showFixedNextButton(show) {
+      if (show) fixedNextWrap.classList.add('show');
+      else fixedNextWrap.classList.remove('show');
+    }
+    fixedNextBtn.onclick = function() {
+      showFixedNextButton(false);
+      newQuestion();
+    };
+
     // Fetch moves.csv and pokemon.json automatically
     Promise.all([
       fetch('moves.csv').then(r => r.text()),
@@ -247,6 +288,7 @@
       document.getElementById('result').textContent = '';
       document.getElementById('nextQuestion').classList.add('hidden');
       document.getElementById('userAnswer').value = '';
+      showFixedNextButton(false);
 
       if (difficulty === "basic") {
         // Only ask for first charged move
@@ -369,16 +411,16 @@
       }
       document.getElementById('result').innerHTML +=
         "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>";
-      document.getElementById('nextQuestion').classList.remove('hidden');
+      showFixedNextButton(true);
       stats.total++;
       if (wasCorrect) stats.correct++;
       saveStats();
       showStats();
     });
 
-    document.getElementById('nextQuestion').addEventListener('click', function() {
-      newQuestion();
-    });
+    // Also hide the original Next Question button in main quiz area
+    document.getElementById('nextQuestion').style.display = "none";
+
   </script>
 </body>
 </html>
