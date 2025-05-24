@@ -344,47 +344,37 @@
   </div>
   <script>
     // --- XP / LEVELS / REWARDS ---
-    // Fruit Rarity Table
     const LEVELUP_REWARDS = [
-      // [emoji, fruit name, probability]
-      // Common (10% each, total 50%)
-      { emoji: "🍏", name: "Apple",        rarity: "🟢 Common", prob: 10 },
-      { emoji: "🍌", name: "Banana",       rarity: "🟢 Common", prob: 10 },
-      { emoji: "🍊", name: "Orange",       rarity: "🟢 Common", prob: 10 },
-      { emoji: "🍇", name: "Grapes",       rarity: "🟢 Common", prob: 10 },
-      { emoji: "🍉", name: "Watermelon",   rarity: "🟢 Common", prob: 10 },
-      // Uncommon (5% each, total 25%)
-      { emoji: "🥝", name: "Kiwi",         rarity: "🔵 Uncommon", prob: 5 },
-      { emoji: "🍈", name: "Pomegranate",  rarity: "🔵 Uncommon", prob: 5 },
-      { emoji: "🥭", name: "Mango",        rarity: "🔵 Uncommon", prob: 5 },
-      { emoji: "🍐", name: "Pear",         rarity: "🔵 Uncommon", prob: 5 },
-      { emoji: "🫐", name: "Blueberries",  rarity: "🔵 Uncommon", prob: 5 },
-      // Rare (3% each, total 15%)
-      { emoji: "🐉", name: "Dragon fruit", rarity: "🟣 Rare",    prob: 3 },
-      { emoji: "🍈", name: "Passion fruit",rarity: "🟣 Rare",    prob: 3 },
-      { emoji: "🌟", name: "Starfruit",    rarity: "🟣 Rare",    prob: 3 },
-      { emoji: "🍒", name: "Lychee",       rarity: "🟣 Rare",    prob: 3 },
-      { emoji: "🍑", name: "Persimmon",    rarity: "🟣 Rare",    prob: 3 },
-      // Epic (2% each, total 8%)
-      { emoji: "🥥", name: "Mangosteen",   rarity: "🟠 Epic",    prob: 2 },
-      { emoji: "🎱", name: "Rambutan",     rarity: "🟠 Epic",    prob: 2 },
-      { emoji: "🪷", name: "Buddha’s Hand",rarity: "🟠 Epic",    prob: 2 },
-      { emoji: "🐍", name: "Salak",        rarity: "🟠 Epic",    prob: 2 },
-      // Legendary (0.67% each, total 2%)
-      { emoji: "🍄", name: "Miracle Fruit",rarity: "🔴 Legendary", prob: 0.67 },
-      { emoji: "🤢", name: "Durian",       rarity: "🔴 Legendary", prob: 0.67 },
-      { emoji: "🍫", name: "Cupuaçu",      rarity: "🔴 Legendary", prob: 0.66 }
+      { emoji: "🍏", name: "Apple",        rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
+      { emoji: "🍌", name: "Banana",       rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
+      { emoji: "🍊", name: "Orange",       rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
+      { emoji: "🍇", name: "Grapes",       rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
+      { emoji: "🍉", name: "Watermelon",   rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
+      { emoji: "🥝", name: "Kiwi",         rarity: "🔵 Uncommon", prob: 5, rarityKey: "Uncommon" },
+      { emoji: "🍈", name: "Pomegranate",  rarity: "🔵 Uncommon", prob: 5, rarityKey: "Uncommon" },
+      { emoji: "🥭", name: "Mango",        rarity: "🔵 Uncommon", prob: 5, rarityKey: "Uncommon" },
+      { emoji: "🍐", name: "Pear",         rarity: "🔵 Uncommon", prob: 5, rarityKey: "Uncommon" },
+      { emoji: "🫐", name: "Blueberries",  rarity: "🔵 Uncommon", prob: 5, rarityKey: "Uncommon" },
+      { emoji: "🐉", name: "Dragon fruit", rarity: "🟣 Rare",    prob: 3, rarityKey: "Rare" },
+      { emoji: "🍈", name: "Passion fruit",rarity: "🟣 Rare",    prob: 3, rarityKey: "Rare" },
+      { emoji: "🌟", name: "Starfruit",    rarity: "🟣 Rare",    prob: 3, rarityKey: "Rare" },
+      { emoji: "🍒", name: "Lychee",       rarity: "🟣 Rare",    prob: 3, rarityKey: "Rare" },
+      { emoji: "🍑", name: "Persimmon",    rarity: "🟣 Rare",    prob: 3, rarityKey: "Rare" },
+      { emoji: "🥥", name: "Mangosteen",   rarity: "🟠 Epic",    prob: 2, rarityKey: "Epic" },
+      { emoji: "🎱", name: "Rambutan",     rarity: "🟠 Epic",    prob: 2, rarityKey: "Epic" },
+      { emoji: "🪷", name: "Buddha’s Hand",prob: 2, rarity: "🟠 Epic", rarityKey: "Epic" },
+      { emoji: "🐍", name: "Salak",        rarity: "🟠 Epic",    prob: 2, rarityKey: "Epic" },
+      { emoji: "🍄", name: "Miracle Fruit",rarity: "🔴 Legendary", prob: 0.67, rarityKey: "Legendary" },
+      { emoji: "🤢", name: "Durian",       rarity: "🔴 Legendary", prob: 0.67, rarityKey: "Legendary" },
+      { emoji: "🍫", name: "Cupuaçu",      rarity: "🔴 Legendary", prob: 0.66, rarityKey: "Legendary" }
     ];
-    // XP for correct answer
     function calcXP(difficulty, onlyHighScore) {
-      // Difficulty: basic=10, multi=20, combo=30; Score>80: +50%
       let base = 10;
       if (difficulty === "multi") base = 20;
       else if (difficulty === "combo") base = 30;
       if (onlyHighScore) base = Math.round(base * 1.5);
       return base;
     }
-    // Level table: level N requires sum_{k=1}^{N} (k*50) XP, i.e. level 1:50, 2:100, 3:150, ...
     function getLevelInfo(xp) {
       let level = 1, total = 0, next = 50;
       while (xp >= total + next) {
@@ -394,17 +384,14 @@
       }
       return { level, xpInLevel: xp - total, xpToNext: next - (xp - total), xpForNext: next };
     }
-    // Pick fruit reward by probability
     function getRandomFruitReward() {
       let r = Math.random() * 100, acc = 0;
       for (let fruit of LEVELUP_REWARDS) {
         acc += fruit.prob;
         if (r < acc) return fruit;
       }
-      // Fallback (should never occur)
       return LEVELUP_REWARDS[0];
     }
-    // XP/Level persistent state
     let xpState = JSON.parse(localStorage.getItem('quizXP') || '{"xp":0,"fruitBag":{}}');
     if (!xpState.fruitBag) xpState.fruitBag = {};
     function saveXP() { localStorage.setItem('quizXP', JSON.stringify(xpState)); }
@@ -412,12 +399,32 @@
       const info = getLevelInfo(xpState.xp);
       document.getElementById('levelstats').textContent =
         `Level ${info.level}  |  XP: ${xpState.xp}  |  Next: ${info.xpToNext} XP`;
-      let bag = Object.entries(xpState.fruitBag)
-        .map(([k,v]) => `${k}×${v}`).join('  ');
-      document.getElementById('xpstats').textContent =
-        bag ? `Fruits: ${bag}` : '';
+      let rarityOrder = ["Common","Uncommon","Rare","Epic","Legendary"];
+      let rarityTitles = {
+        Common: "🟢 Common",
+        Uncommon: "🔵 Uncommon",
+        Rare: "🟣 Rare",
+        Epic: "🟠 Epic",
+        Legendary: "🔴 Legendary"
+      };
+      let bagByRarity = {};
+      for (let fruit of LEVELUP_REWARDS) {
+        let count = xpState.fruitBag[fruit.emoji] || 0;
+        if (count === 0) continue;
+        if (!bagByRarity[fruit.rarityKey]) bagByRarity[fruit.rarityKey] = [];
+        bagByRarity[fruit.rarityKey].push({ ...fruit, count });
+      }
+      let bagHTML = rarityOrder.map(rarity => {
+        let arr = bagByRarity[rarity];
+        if (!arr || arr.length === 0) return "";
+        let fruitsHTML = arr.map(f =>
+          `<span title="${f.name}" style="font-size:1.4em;margin-right:0.05em">${f.emoji}×${f.count}</span>`
+        ).join(" ");
+        return `<div><span style="font-size:1.04em">${rarityTitles[rarity]}:</span> ${fruitsHTML}</div>`;
+      }).join("");
+      document.getElementById('xpstats').innerHTML =
+        bagHTML ? `<div style="margin-top:0.2em">${bagHTML}</div>` : "";
     }
-    // Level up reward display
     function showLevelupReward(fruit) {
       let div = document.getElementById("levelupReward");
       if (!fruit) { div.textContent = ""; return; }
@@ -426,8 +433,6 @@
         `<b>Level Up!</b> You received a <b>${fruit.rarity} ${fruit.name}</b>!`;
       setTimeout(() => { div.textContent = ""; }, 5500);
     }
-    // --- END XP / LEVELS / REWARDS ---
-
     // -- Meta settings (CSV file list) --
     const metaCSVFILES = [
       { file: "cp1500_all_overall_rankings.csv", label: "Great" },
@@ -537,13 +542,11 @@
         });
     }
 
-    // Trick question detection: returns true if using this fast/charge combo always leaves energy 0 after each use
     function isTrickCombo(fastEnergy, chargeEnergy) {
       if (!fastEnergy || !chargeEnergy) return false;
       return (chargeEnergy % fastEnergy === 0);
     }
 
-    // ... timer, stats, parsing, explanation, and helpers are unchanged ...
     let stats = JSON.parse(localStorage.getItem('quizStats') ||
       '{"total":0,"correct":0,"sumTime":0,"sumTimeRight":0,"rightCount":0}');
     if (stats.sumTime === undefined) stats.sumTime = 0;
@@ -562,7 +565,6 @@
     }
     showStats();
     showXP();
-    // Timer logic
     let timerStart = null, timerInterval = null, timerActive = false;
     const timerSpan = document.getElementById('timer');
     const timerBox = document.getElementById('timerBox');
@@ -606,7 +608,6 @@
       if (!timerStart) return 0;
       return (Date.now() - timerStart) / 1000;
     }
-    // Difficulty logic
     let difficulty = localStorage.getItem("quizDifficulty") || "multi";
     document.getElementById('difficultySelect').value = difficulty;
     document.getElementById('difficultySelect').onchange = function() {
@@ -615,10 +616,10 @@
       newQuestion();
     };
     document.getElementById('resetStats').onclick = function() {
+      if (!window.confirm("Are you sure you want to reset your stats, XP, and fruit collection?")) return;
       stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
       saveStats();
       showStats();
-      // Also reset XP
       xpState = { xp: 0, fruitBag: {} };
       saveXP();
       showXP();
@@ -767,7 +768,6 @@
       if (onlyPreferredMoveset && metaPreferred[name]) {
         let c1 = metaPreferred[name].charge1;
         let c2 = metaPreferred[name].charge2;
-        // Remove duplicates and blanks
         return [c1, c2].filter((mv, i, arr) => mv && arr.indexOf(mv) === i && !!movesByName[mv]);
       }
       return (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
@@ -799,7 +799,6 @@
         document.getElementById('answerForm').classList.add('hidden');
         return;
       }
-      // --- BASIC ---
       if (difficulty === "basic") {
         let tries = 0, pokemon, fastList, chargeList, fast, charge;
         do {
@@ -830,7 +829,6 @@
         startTimer();
         return;
       }
-      // --- COMBO ---
       if (difficulty === "combo") {
         if (Math.random() < 1/3) {
           let tries = 0, pokemon, fastList, chargeList, chargeAIdx, chargeBIdx, fast, chargeA, chargeB;
@@ -890,7 +888,6 @@
           startTimer();
           return;
         } else {
-          // multi-charge as fallback in combo mode
           let tries = 0, pokemon, fastList, chargeList, fast, charge, which;
           do {
             pokemon = pickEligiblePokemon();
@@ -922,7 +919,6 @@
           return;
         }
       }
-      // --- MULTI-CHARGE ---
       let tries = 0, pokemon, fastList, chargeList, fast, charge, which;
       do {
         pokemon = pickEligiblePokemon();
@@ -990,7 +986,6 @@
       saveStats();
       showStats();
 
-      // --- XP LOGIC ---
       if (wasCorrect) {
         const xpGain = calcXP(difficulty, onlyHighScore);
         let prevXP = xpState.xp;
@@ -1000,7 +995,6 @@
         saveXP();
         showXP();
         if (newLevel > prevLevel) {
-          // Level up! Give fruit
           let fruit = getRandomFruitReward();
           if (!xpState.fruitBag[fruit.emoji]) xpState.fruitBag[fruit.emoji] = 0;
           xpState.fruitBag[fruit.emoji]++;
@@ -1012,7 +1006,6 @@
         }
       }
     });
-    // Floating Next Button logic (NO close button, cannot be hidden)
     const fixedNextWrap = document.getElementById('fixedNextWrap');
     const fixedNextBtn = document.getElementById('fixedNextBtn');
     function showFixedNextButton(show) {
@@ -1023,7 +1016,6 @@
       showFixedNextButton(false);
       newQuestion();
     };
-    // Hide the original Next Question button in main quiz area
     document.getElementById('nextQuestion').style.display = "none";
   </script>
 </body>
