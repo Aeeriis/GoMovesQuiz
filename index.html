@@ -62,7 +62,7 @@
       margin-top: 0.12em;
       align-items: center;
     }
-    #metaScoreLabel, #metaPrefLabel {
+    #metaScoreLabel, #metaPrefLabel, #noTrickLabel {
       font-size: 0.97em;
       font-weight: bold;
       user-select: none;
@@ -72,12 +72,12 @@
       margin: 0;
       padding: 0;
     }
-    #metaScore, #metaPref {
+    #metaScore, #metaPref, #noTrick {
       vertical-align: middle;
       margin-right: 0.4em;
       accent-color: #228be6;
     }
-    #metaScoreExplain, #metaPrefExplain {
+    #metaScoreExplain, #metaPrefExplain, #noTrickExplain {
       font-size: 0.93em;
       color: #234;
       margin-top: 0.15em;
@@ -226,7 +226,7 @@
         margin-bottom: 0.2em;
         margin-left: 0;
       }
-      #metaScoreExplain, #metaPrefExplain { font-size: 0.88em; padding-left: 0.3em; }
+      #metaScoreExplain, #metaPrefExplain, #noTrickExplain { font-size: 0.88em; padding-left: 0.3em; }
       .disclaimer { font-size: 0.95em; padding: 0.56em 0.7em; }
     }
   </style>
@@ -268,6 +268,10 @@
           <input type="checkbox" id="metaPref" />
           Preferred moveset only
         </label>
+        <label id="noTrickLabel" title="Avoid 'trick questions' where every charged move always leaves 0 energy (e.g. Extrasensory/Rock Tomb)">
+          <input type="checkbox" id="noTrick" />
+          Avoid trick questions
+        </label>
       </div>
       <div id="metaScoreExplain">
         <b>What does "Score &gt; 80" mean?</b><br>
@@ -277,6 +281,10 @@
       <div id="metaPrefExplain">
         <b>What does "Preferred moveset only" mean?</b><br>
         This only asks about the best/most recommended movesets for each Pokémon, as listed in the selected meta's CSV (columns <b>Fast Move</b>, <b>Charged Move 1</b> and <b>Charged Move 2</b>).
+      </div>
+      <div id="noTrickExplain">
+        <b>What does "Avoid trick questions" mean?</b><br>
+        Some fast/charged move combinations (e.g. Extrasensory and Rock Tomb) always leave you with exactly 0 energy after each charged move, which means the answer for the 2nd, 3rd, etc. charged move is always exactly the same as the 1st (no leftover energy ever). When enabled, this setting avoids generating these repetitive, "trick" questions.
       </div>
       <div id="metaWarn" style="color:#b00;font-size:0.98em;padding:0.1em 0 0.2em 0;"></div>
       <div style="font-size:0.9em;color:#888;margin-top:0.2em;">
@@ -315,7 +323,6 @@
       <button id="fixedNextBtn" type="button">Next Question</button>
     </span>
   </div>
-  <!-- ... JavaScript remains unchanged ... -->
   <script>
     // -- Meta settings (CSV file list) --
     const metaCSVFILES = [
@@ -336,10 +343,11 @@
     const metaRootURL = `https://raw.githubusercontent.com/${githubUser}/${githubRepo}/main/rankings/`;
 
     let metaPokes = [];
-    let metaPreferred = {}; // { [Pokemon Name]: { fast: ..., charge1: ..., charge2: ... }, ... }
+    let metaPreferred = {};
     let currentMeta = localStorage.getItem("quizMeta") || metaCSVFILES[0].file;
     let onlyHighScore = localStorage.getItem("onlyHighScore") === "true";
     let onlyPreferredMoveset = localStorage.getItem("onlyPreferredMoveset") === "true";
+    let avoidTrickQuestions = localStorage.getItem("avoidTrickQuestions") === "true";
 
     function populateMetaMenu() {
       const metaSelect = document.getElementById('metaSelect');
@@ -353,6 +361,7 @@
       metaSelect.value = currentMeta;
       document.getElementById('metaScore').checked = onlyHighScore;
       document.getElementById('metaPref').checked = onlyPreferredMoveset;
+      document.getElementById('noTrick').checked = avoidTrickQuestions;
       loadMetaAndApply();
     }
     document.getElementById('metaSelect').onchange = function() {
@@ -368,6 +377,11 @@
     document.getElementById('metaPref').onchange = function() {
       onlyPreferredMoveset = this.checked;
       localStorage.setItem("onlyPreferredMoveset", onlyPreferredMoveset);
+      loadMetaAndApply();
+    };
+    document.getElementById('noTrick').onchange = function() {
+      avoidTrickQuestions = this.checked;
+      localStorage.setItem("avoidTrickQuestions", avoidTrickQuestions);
       loadMetaAndApply();
     };
 
@@ -419,7 +433,15 @@
         });
     }
 
-    // Timer and stats logic (unchanged)
+    // Trick question detection: returns true if using this fast/charge combo always leaves energy 0 after each use
+    function isTrickCombo(fastEnergy, chargeEnergy) {
+      // Trick if: chargeEnergy % fastEnergy == 0 AND chargeEnergy/fastEnergy * fastEnergy == chargeEnergy
+      // and after every cycle, leftover is 0
+      if (!fastEnergy || !chargeEnergy) return false;
+      return (chargeEnergy % fastEnergy === 0);
+    }
+
+    // ... timer, stats, parsing, explanation, and helpers are unchanged ...
     let stats = JSON.parse(localStorage.getItem('quizStats') ||
       '{"total":0,"correct":0,"sumTime":0,"sumTimeRight":0,"rightCount":0}');
     if (stats.sumTime === undefined) stats.sumTime = 0;
@@ -669,17 +691,27 @@
         document.getElementById('answerForm').classList.add('hidden');
         return;
       }
+      // --- BASIC ---
       if (difficulty === "basic") {
-        let pokemon = pickEligiblePokemon();
+        let tries = 0, pokemon, fastList, chargeList, fast, charge;
+        do {
+          pokemon = pickEligiblePokemon();
+          if (!pokemon) break;
+          fastList = getPreferredOrAllFastMoves(pokemon);
+          chargeList = getPreferredOrAllChargeMoves(pokemon);
+          fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+          charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
+          tries++;
+        } while (
+          avoidTrickQuestions &&
+          isTrickCombo(fast.Energy, charge.Energy) &&
+          tries < 30
+        );
         if (!pokemon) {
           document.getElementById('question').textContent = 'No eligible Pokémon found. Please check your data files.';
           document.getElementById('answerForm').classList.add('hidden');
           return;
         }
-        let fastList = getPreferredOrAllFastMoves(pokemon);
-        let chargeList = getPreferredOrAllChargeMoves(pokemon);
-        let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
-        let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
         let which = 1; // Always 1st
         let nthText = getOrdinalText(which);
         let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
@@ -690,30 +722,40 @@
         startTimer();
         return;
       }
+      // --- COMBO ---
       if (difficulty === "combo") {
         if (Math.random() < 1/3) {
-          let eligible = pokedex.filter(poke => {
-            let name = poke.speciesName;
-            let fastList, chargeList;
-            if (onlyPreferredMoveset && metaPreferred[name]) {
-              fastList = [metaPreferred[name].fast].filter(mv => !!movesByName[mv]);
-              chargeList = [metaPreferred[name].charge1, metaPreferred[name].charge2].filter(mv => !!movesByName[mv]);
-            } else {
-              fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
-              chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
-            }
-            return fastList.length && chargeList.length >= 2 && (!metaPokes.length || metaPokes.includes(name));
-          });
-          if (!eligible.length) return newQuestion();
-          let pokemon = eligible[Math.floor(Math.random() * eligible.length)];
-          let fastList = getPreferredOrAllFastMoves(pokemon);
-          let chargeList = getPreferredOrAllChargeMoves(pokemon);
-          let chargeAIdx = Math.floor(Math.random() * chargeList.length);
-          let chargeBIdx;
-          do { chargeBIdx = Math.floor(Math.random() * chargeList.length); } while (chargeBIdx === chargeAIdx);
-          let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
-          let chargeA = movesByName[chargeList[chargeAIdx]];
-          let chargeB = movesByName[chargeList[chargeBIdx]];
+          let tries = 0, pokemon, fastList, chargeList, chargeAIdx, chargeBIdx, fast, chargeA, chargeB;
+          do {
+            let eligible = pokedex.filter(poke => {
+              let name = poke.speciesName;
+              let fList, cList;
+              if (onlyPreferredMoveset && metaPreferred[name]) {
+                fList = [metaPreferred[name].fast].filter(mv => !!movesByName[mv]);
+                cList = [metaPreferred[name].charge1, metaPreferred[name].charge2].filter(mv => !!movesByName[mv]);
+              } else {
+                fList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
+                cList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
+              }
+              return fList.length && cList.length >= 2 && (!metaPokes.length || metaPokes.includes(name));
+            });
+            if (!eligible.length) break;
+            pokemon = eligible[Math.floor(Math.random() * eligible.length)];
+            fastList = getPreferredOrAllFastMoves(pokemon);
+            chargeList = getPreferredOrAllChargeMoves(pokemon);
+            chargeAIdx = Math.floor(Math.random() * chargeList.length);
+            do { chargeBIdx = Math.floor(Math.random() * chargeList.length); } while (chargeBIdx === chargeAIdx);
+            fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+            chargeA = movesByName[chargeList[chargeAIdx]];
+            chargeB = movesByName[chargeList[chargeBIdx]];
+            tries++;
+          } while (
+            avoidTrickQuestions &&
+            isTrickCombo(fast.Energy, chargeA.Energy) &&
+            isTrickCombo(fast.Energy, chargeB.Energy) &&
+            tries < 30
+          );
+          if (!pokemon) return newQuestion();
           let nA = 1 + Math.floor(Math.random() * 3); // 1-3 times
           let energy = 0, totalFasts = 0;
           for (let i=0; i<nA; ++i) {
@@ -740,17 +782,28 @@
           startTimer();
           return;
         } else {
-          let pokemon = pickEligiblePokemon();
+          // multi-charge as fallback in combo mode
+          let tries = 0, pokemon, fastList, chargeList, fast, charge, which;
+          do {
+            pokemon = pickEligiblePokemon();
+            if (!pokemon) break;
+            fastList = getPreferredOrAllFastMoves(pokemon);
+            chargeList = getPreferredOrAllChargeMoves(pokemon);
+            fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+            charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
+            which = 1 + Math.floor(Math.random() * 4); // 1~4
+            tries++;
+          } while (
+            avoidTrickQuestions &&
+            isTrickCombo(fast.Energy, charge.Energy) &&
+            which > 1 &&
+            tries < 30
+          );
           if (!pokemon) {
             document.getElementById('question').textContent = 'No eligible Pokémon found. Please check your data files.';
             document.getElementById('answerForm').classList.add('hidden');
             return;
           }
-          let fastList = getPreferredOrAllFastMoves(pokemon);
-          let chargeList = getPreferredOrAllChargeMoves(pokemon);
-          let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
-          let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
-          let which = 1 + Math.floor(Math.random() * 4); // 1~4
           let nthText = getOrdinalText(which);
           let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
           currentPair = { fast, charge, pokemon, needed, which, nthText, isCombo: false };
@@ -761,17 +814,28 @@
           return;
         }
       }
-      let pokemon = pickEligiblePokemon();
+      // --- MULTI-CHARGE ---
+      let tries = 0, pokemon, fastList, chargeList, fast, charge, which;
+      do {
+        pokemon = pickEligiblePokemon();
+        if (!pokemon) break;
+        fastList = getPreferredOrAllFastMoves(pokemon);
+        chargeList = getPreferredOrAllChargeMoves(pokemon);
+        fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+        charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
+        which = 1 + Math.floor(Math.random() * 4); // 1~4
+        tries++;
+      } while (
+        avoidTrickQuestions &&
+        isTrickCombo(fast.Energy, charge.Energy) &&
+        which > 1 &&
+        tries < 30
+      );
       if (!pokemon) {
         document.getElementById('question').textContent = 'No eligible Pokémon found. Please check your data files.';
         document.getElementById('answerForm').classList.add('hidden');
         return;
       }
-      let fastList = getPreferredOrAllFastMoves(pokemon);
-      let chargeList = getPreferredOrAllChargeMoves(pokemon);
-      let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
-      let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
-      let which = 1 + Math.floor(Math.random() * 4); // 1~4
       let nthText = getOrdinalText(which);
       let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
       currentPair = { fast, charge, pokemon, needed, which, nthText, isCombo: false };
