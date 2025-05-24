@@ -10,10 +10,9 @@
     .container { max-width: 480px; margin: auto; padding: 1em; }
     h1 { font-size: 1.6em; }
     ol { padding-left: 1.3em; }
-    .hidden { display: none; }
     .quiz-section { margin-top: 2em; }
     .result { margin-top: 1em; font-weight: bold; }
-    input[type="number"], input[type="file"] { width: 90%; font-size: 1.2em; }
+    input[type="number"] { width: 90%; font-size: 1.2em; }
     button { font-size: 1.1em; padding: 0.6em 1.2em; margin-top: 1em;}
     label { font-size: 1.1em; }
     #question { font-size: 1.15em; margin-bottom: 1em; }
@@ -27,13 +26,9 @@
   <div class="container">
     <h1>Pokémon Go Moveset Energy Quiz</h1>
     <ol>
-      <li>Upload <code>moves.csv</code> (move stats).</li>
-      <li>Upload <code>pokemon.json</code> (Pokémon movesets).</li>
       <li>Guess how many Fast Attacks are needed to use the 1st, 2nd, or 3rd Charged Move for a random Pokémon!</li>
     </ol>
-    <input type="file" id="csvInput" accept=".csv" />
-    <input type="file" id="jsonInput" accept=".json,application/JSON" class="hidden" />
-
+    <div id="loading">Loading data...</div>
     <div class="quiz-section hidden" id="quizSection">
       <div id="question"></div>
       <form id="answerForm">
@@ -46,43 +41,27 @@
     </div>
   </div>
   <script>
-    // JS logic (same as improved HTML version above, mobile tweaks)
     let moves = [];
     let movesByName = {};
     let pokedex = [];
     let currentPair = {};
 
-    document.getElementById('csvInput').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-          moves = parseCSV(event.target.result);
-          movesByName = {};
-          moves.forEach(mv => {
-            movesByName[mv.Move.trim().toUpperCase().replace(/ /g, "_")] = mv;
-            movesByName[mv.Move.trim()] = mv;
-          });
-          document.getElementById('jsonInput').classList.remove('hidden');
-        };
-        reader.readAsText(file);
-      }
-    });
-
-    document.getElementById('jsonInput').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-          try {
-            pokedex = JSON.parse(event.target.result);
-            startQuiz();
-          } catch(err) {
-            alert("Could not parse JSON: " + err);
-          }
-        };
-        reader.readAsText(file);
-      }
+    // Fetch moves.csv and pokemon.json automatically
+    Promise.all([
+      fetch('moves.csv').then(r => r.text()),
+      fetch('pokemon.json').then(r => r.json())
+    ]).then(([csvData, pokeData]) => {
+      moves = parseCSV(csvData);
+      movesByName = {};
+      moves.forEach(mv => {
+        movesByName[mv.Move.trim().toUpperCase().replace(/ /g, "_")] = mv;
+        movesByName[mv.Move.trim()] = mv;
+      });
+      pokedex = pokeData;
+      document.getElementById('loading').classList.add('hidden');
+      startQuiz();
+    }).catch(err => {
+      document.getElementById('loading').textContent = "Failed to load data. Make sure moves.csv and pokemon.json are present.";
     });
 
     function parseCSV(data) {
@@ -181,12 +160,6 @@
       newQuestion();
     });
 
-    // PWA: Register service worker for offline use (optional but recommended)
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('service-worker.js').catch(() => {});
-      });
-    }
   </script>
 </body>
 </html>
