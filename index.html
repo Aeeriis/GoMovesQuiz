@@ -343,15 +343,19 @@
     </span>
   </div>
   <script>
+    // --- ANTI-FARMING STATE ---
+    // This flag determines if XP has already been awarded for the current question
+    let xpAwardedForCurrentQuestion = false;
+
     // --- XP / LEVELS / REWARDS ---
     const LEVELUP_REWARDS = [
-      { emoji: "🍏", name: "Apple",        rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
+      { emoji: "🍎", name: "Apple",        rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
       { emoji: "🍌", name: "Banana",       rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
       { emoji: "🍊", name: "Orange",       rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
       { emoji: "🍇", name: "Grapes",       rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
       { emoji: "🍉", name: "Watermelon",   rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
       { emoji: "🥝", name: "Kiwi",         rarity: "🔵 Uncommon", prob: 5, rarityKey: "Uncommon" },
-      { emoji: "🍈", name: "Pomegranate",  rarity: "🔵 Uncommon", prob: 5, rarityKey: "Uncommon" },
+      { emoji: "🍏", name: "Pomegranate",  rarity: "🔵 Uncommon", prob: 5, rarityKey: "Uncommon" },
       { emoji: "🥭", name: "Mango",        rarity: "🔵 Uncommon", prob: 5, rarityKey: "Uncommon" },
       { emoji: "🍐", name: "Pear",         rarity: "🔵 Uncommon", prob: 5, rarityKey: "Uncommon" },
       { emoji: "🫐", name: "Blueberries",  rarity: "🔵 Uncommon", prob: 5, rarityKey: "Uncommon" },
@@ -788,6 +792,9 @@
       return fastsToEachCharge[n-1];
     }
     function newQuestion() {
+      // Reset anti-farming flag so XP can be awarded for the new question
+      xpAwardedForCurrentQuestion = false;
+
       document.getElementById('result').textContent = '';
       document.getElementById('nextQuestion').classList.add('hidden');
       document.getElementById('userAnswer').value = '';
@@ -948,8 +955,33 @@
       document.getElementById('answerForm').classList.remove('hidden');
       startTimer();
     }
+
     document.getElementById('answerForm').addEventListener('submit', function(e) {
       e.preventDefault();
+
+      // --- Prevent XP farming: if XP has already been awarded for this question, just show the result and explanation, but do NOT give XP/stats again ---
+      if (xpAwardedForCurrentQuestion) {
+        // Show the result and explanation again, but do not update stats/xp
+        const userAnswer = parseInt(document.getElementById('userAnswer').value, 10);
+        let wasCorrect = (userAnswer === currentPair.needed);
+        document.getElementById('result').textContent = wasCorrect ? '✅ Correct!' : `❌ Incorrect. The correct answer is ${currentPair.needed}.`;
+        let timeText = "";
+        let elapsed = 0;
+        if (timerEnabled && typeof timerStart === "number" && timerStart > 0) {
+          elapsed = getTimerElapsed();
+          timeText = "Answered in " + elapsed.toFixed(2) + " s";
+        }
+        updateTimerVisibilityOnAnswer(timeText);
+        if (timerEnabled && timeText) {
+          document.getElementById('result').innerHTML +=
+            `<br><span style="color:#228be6;font-weight:bold;">${timeText}</span>`;
+        }
+        document.getElementById('result').innerHTML +=
+          "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>";
+        showFixedNextButton(true);
+        return; // Early exit: do not award xp/stats again
+      }
+
       stopTimer();
       const userAnswer = parseInt(document.getElementById('userAnswer').value, 10);
       let wasCorrect = false;
@@ -981,12 +1013,15 @@
       document.getElementById('result').innerHTML +=
         "<br><span style='font-size:0.95em;color:#555;'>" + getExplanation(currentPair) + "</span>";
       showFixedNextButton(true);
+
       stats.total++;
       if (wasCorrect) stats.correct++;
       saveStats();
       showStats();
 
-      if (wasCorrect) {
+      // --- AWARD XP ONLY ON FIRST SUBMIT for this question ---
+      if (wasCorrect && !xpAwardedForCurrentQuestion) {
+        xpAwardedForCurrentQuestion = true; // Mark this question as "xp already given"
         const xpGain = calcXP(difficulty, onlyHighScore);
         let prevXP = xpState.xp;
         xpState.xp += xpGain;
@@ -1004,8 +1039,11 @@
         } else {
           showLevelupReward(null);
         }
+      } else {
+        showLevelupReward(null);
       }
     });
+
     const fixedNextWrap = document.getElementById('fixedNextWrap');
     const fixedNextBtn = document.getElementById('fixedNextBtn');
     function showFixedNextButton(show) {
