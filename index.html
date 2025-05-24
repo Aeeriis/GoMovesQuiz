@@ -55,6 +55,8 @@
       document.getElementById('stats').textContent =
         `Score: ${stats.correct}/${stats.total} (${stats.total ? Math.round(100 * stats.correct / stats.total) : 0}%)`;
     }
+    showStats(); // <-- This ensures stats are always visible
+
     document.getElementById('resetStats').onclick = function() {
       stats = { total: 0, correct: 0 };
       saveStats();
