@@ -29,17 +29,27 @@
       font-size: 1.08em;
       color: #333;
       margin: 0;
-      margin-bottom: 0.7em;
+      margin-bottom: 0.4em;
       display: flex;
       align-items: center;
       gap: 1.3em;
       user-select: none;
       justify-content: flex-start;
       padding-left: 0;
+      flex-wrap: wrap;
     }
     #metaSelect {
       font-size: 1em;
       margin-right: 1.2em;
+    }
+    #metaToggleWrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.1em;
+      margin-bottom: 0.15em;
+      margin-left: 0.1em;
+      margin-top: 0.12em;
+      align-items: center;
     }
     #metaScoreLabel, #metaPrefLabel {
       font-size: 0.97em;
@@ -48,7 +58,8 @@
       cursor: pointer;
       display: flex;
       align-items: center;
-      margin-right: 1.3em;
+      margin: 0;
+      padding: 0;
     }
     #metaScore, #metaPref {
       vertical-align: middle;
@@ -58,10 +69,10 @@
     #metaScoreExplain, #metaPrefExplain {
       font-size: 0.93em;
       color: #234;
-      margin-top: 0.18em;
-      margin-bottom: 0.15em;
+      margin-top: 0.15em;
+      margin-bottom: 0.13em;
       line-height: 1.35;
-      padding-left: 2.1em;
+      padding-left: 0.1em;
     }
     #intro-explanation { margin: 1.1em 0 0.7em 0; background: #f0f7ff; border-radius: 8px; padding: 0.8em; font-size: 1.07em; color: #234; }
     #fixedNextWrap {
@@ -192,6 +203,18 @@
       #timerBox { font-size: 1em; gap: 0.7em; }
       #timerToggleLabel { font-size: 1em; }
       #fixedNextBtn { margin-bottom: 2em; }
+      #metaBox {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.3em;
+      }
+      #metaToggleWrap {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35em;
+        margin-bottom: 0.2em;
+        margin-left: 0;
+      }
       #metaScoreExplain, #metaPrefExplain { font-size: 0.88em; padding-left: 0.3em; }
     }
   </style>
@@ -220,6 +243,8 @@
       <div id="metaBox">
         <label for="metaSelect"><b>Meta:</b></label>
         <select id="metaSelect"></select>
+      </div>
+      <div id="metaToggleWrap">
         <label id="metaScoreLabel" title="Only show Pokémon with score above 80 in this meta">
           <input type="checkbox" id="metaScore" />
           Only Score &gt; 80
@@ -276,7 +301,7 @@
     </span>
   </div>
   <script>
-    // HARDCODED metas, sorted and renamed as requested:
+    // -- Meta settings (CSV file list) --
     const metaCSVFILES = [
       { file: "cp1500_all_overall_rankings.csv", label: "Great" },
       { file: "cp2500_all_overall_rankings.csv", label: "Ultra" },
