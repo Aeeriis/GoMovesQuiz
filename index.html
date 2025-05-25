@@ -242,6 +242,33 @@
       .disclaimer { font-size: 0.95em; padding: 0.56em 0.7em; }
       .copyright { font-size: 0.78em; }
     }
+    /* Step 2: Add to your <style> block or a CSS file */
+
+#achievementsBtn {
+  font-size: 1.45em;
+  vertical-align: middle;
+  transition: filter 0.18s;
+}
+#achievementsBtn:hover {
+  filter: brightness(1.25) drop-shadow(0 0 4px #ffd70088);
+}
+#achievementsModal {
+  animation: fadein 0.14s;
+}
+@keyframes fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.achievement-locked {
+  color: #aaa;
+  opacity: 0.65;
+  filter: grayscale(0.7);
+}
+.achievement-unlocked {
+  color: #1a8700;
+  font-weight: bold;
+  filter: none;
+}
   </style>
 </head>
 <body>
@@ -259,6 +286,20 @@
       </ul>
       After each answer, an explanation with energy breakdown is shown to help you learn!
     </div>
+<!-- Step 1: Add this near your level/xp stats, ideally after #levelstats/#xpstats -->
+<div id="achievementsBtn" style="display:inline-block;cursor:pointer;margin-left:0.5em;" title="Achievements">
+  🏆
+</div>
+<!-- Achievements Modal -->
+<div id="achievementsModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.25);z-index:9999;">
+  <div style="background:#fff;max-width:380px;margin:7vh auto;padding:1.2em 1.25em;border-radius:14px;box-shadow:0 2px 24px #0002;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.7em;">
+      <span style="font-size:1.26em;font-weight:bold;">Achievements</span>
+      <button id="closeAchievements" style="font-size:1.1em;padding:0.25em 0.65em;border-radius:7px;border:1px solid #ccc;background:#eee;cursor:pointer;">✕</button>
+    </div>
+    <div id="achievementsList" style="font-size:1.03em;line-height:1.5;"></div>
+  </div>
+</div>
     <div id="difficultyWrap">
       <label for="difficultySelect"><b>Difficulty:</b></label>
       <select id="difficultySelect">
@@ -1055,6 +1096,130 @@
       newQuestion();
     };
     document.getElementById('nextQuestion').style.display = "none";
+    // Step 3: Add to your <script> section
+
+// -- Achievements definitions --
+const ACHIEVEMENTS = [
+  {
+    id: "first_correct",
+    name: "First Correct!",
+    desc: "Get your first correct answer.",
+    emoji: "🎯",
+    check: () => stats.correct >= 1
+  },
+  {
+    id: "ten_correct",
+    name: "On a Roll",
+    desc: "Get 10 correct answers.",
+    emoji: "🔥",
+    check: () => stats.correct >= 10
+  },
+  {
+    id: "fifty_correct",
+    name: "Quiz Veteran",
+    desc: "Get 50 correct answers.",
+    emoji: "🏅",
+    check: () => stats.correct >= 50
+  },
+  {
+    id: "level5",
+    name: "Level 5",
+    desc: "Reach level 5.",
+    emoji: "🆙",
+    check: () => getLevelInfo(xpState.xp).level >= 5
+  },
+  {
+    id: "fruits_collected5",
+    name: "Fruit Collector",
+    desc: "Collect 5 different fruit.",
+    emoji: "🍍",
+    check: () => Object.keys(xpState.fruitBag).filter(k => xpState.fruitBag[k] > 0).length >= 5
+  },
+  {
+    id: "fruits_collected15",
+    name: "Fruit Hoarder",
+    desc: "Collect 15 different fruit.",
+    emoji: "🍉",
+    check: () => Object.keys(xpState.fruitBag).filter(k => xpState.fruitBag[k] > 0).length >= 15
+  },
+  // Add more as desired!
+];
+
+let achievementsUnlocked = JSON.parse(localStorage.getItem('achievementsUnlocked') || '{}');
+
+function saveAchievements() {
+  localStorage.setItem('achievementsUnlocked', JSON.stringify(achievementsUnlocked));
+}
+
+function checkAchievements(showPopupIfNew = true) {
+  let newlyUnlocked = [];
+  ACHIEVEMENTS.forEach(ach => {
+    if (!achievementsUnlocked[ach.id] && ach.check()) {
+      achievementsUnlocked[ach.id] = Date.now();
+      newlyUnlocked.push(ach);
+    }
+  });
+  if (newlyUnlocked.length && showPopupIfNew) {
+    showAchievementsModal(true, newlyUnlocked);
+    // Optionally, add some confetti or highlight effect!
+  }
+  saveAchievements();
+  updateAchievementsBtn();
+}
+
+function updateAchievementsBtn() {
+  // Add a little dot/shine if new unlocks
+  const btn = document.getElementById('achievementsBtn');
+  let hasNew = ACHIEVEMENTS.some(ach => achievementsUnlocked[ach.id]);
+  btn.style.filter = hasNew ? "drop-shadow(0 0 4px #ffd70088)" : "none";
+}
+
+function showAchievementsModal(justUnlocked = false, unlockedList = []) {
+  const modal = document.getElementById('achievementsModal');
+  const listDiv = document.getElementById('achievementsList');
+  let html = "";
+  ACHIEVEMENTS.forEach(ach => {
+    let unlocked = !!achievementsUnlocked[ach.id];
+    html += `<div class="${unlocked ? "achievement-unlocked" : "achievement-locked"}" style="margin-bottom:0.5em;">
+      <span style="font-size:1.35em;margin-right:0.23em;">${ach.emoji}</span>
+      <b>${ach.name}</b><br>
+      <span style="font-size:0.96em;">${ach.desc}</span>
+      ${unlocked ? `<span style="font-size:0.85em;color:#09a;margin-left:0.25em;">✔ Unlocked</span>` : ""}
+    </div>`;
+  });
+  if (justUnlocked && unlockedList.length) {
+    html = `<div style="background:#eaffda;border-radius:7px;padding:0.5em 0.7em;margin-bottom:1em;">
+      <b>New achievement${unlockedList.length > 1 ? "s" : ""} unlocked!</b><br>` +
+      unlockedList.map(a => `<span style="font-size:1.2em;">${a.emoji}</span> <b>${a.name}</b>`).join("<br>") +
+      `</div>` + html;
+  }
+  listDiv.innerHTML = html;
+  modal.style.display = "block";
+}
+
+// Modal open/close
+document.getElementById('achievementsBtn').onclick = function() {
+  showAchievementsModal(false);
+};
+document.getElementById('closeAchievements').onclick = function() {
+  document.getElementById('achievementsModal').style.display = "none";
+};
+document.getElementById('achievementsModal').onclick = function(e) {
+  if (e.target === this) this.style.display = "none";
+};
+
+// Step 4: Call checkAchievements() in key places:
+// - At the end of your answer submit handler (after updating stats/xp/fruitBag):
+//   checkAchievements();
+// - Also after loading stats/xp on page load:
+checkAchievements(false); // Do not popup at load, just update icon
+
+// If user resets stats/xp, also reset achievements:
+document.getElementById('resetStats').addEventListener('click', function() {
+  achievementsUnlocked = {};
+  saveAchievements();
+  checkAchievements(false);
+});
   </script>
 </body>
 </html>
