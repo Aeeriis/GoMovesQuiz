@@ -242,25 +242,6 @@
       .disclaimer { font-size: 0.95em; padding: 0.56em 0.7em; }
       .copyright { font-size: 0.78em; }
     }
-/* Add in your <style> ... */
-#achievementsPanel {
-  background: #f8f8fb; border: 2px solid #ffe066; border-radius: 14px;
-  margin: 1em 0; padding: 1.2em 0.8em 1.7em 0.8em;
-  box-shadow: 0 2px 14px #ffe06633; text-align: center; font-size: 1.10em;
-  position: relative; z-index: 102; animation: pop-in 0.7s cubic-bezier(.4,2,.3,1);
-}
-#achievementsList { display: flex; flex-wrap: wrap; gap: 0.8em; justify-content: center; }
-.achievement {
-  background: #fff; border-radius: 10px; border: 1px solid #d0d8e8;
-  width: 145px; min-height: 92px; padding: 0.6em 0.3em 0.2em 0.3em; position: relative;
-  display: flex; flex-direction: column; align-items: center; filter: grayscale(90%) brightness(1.12);
-  opacity: 0.6; transition: all 0.2s;
-}
-.achievement.unlocked { filter: none; opacity: 1; border: 2px solid #ffe066; background: #fcf9e3; }
-.achievement .icon { font-size: 2em; margin-bottom: 0.23em; }
-.achievement .label { font-weight:bold; color: #333; }
-.achievement .desc { font-size: 0.98em; color: #555; margin-top: 0.2em; }
-.achievement .date { font-size: 0.82em; color: #3c3; margin-top: 0.3em; }
   </style>
 </head>
 <body>
@@ -286,12 +267,6 @@
         <option value="combo">Combo</option>
       </select>
     </div>
-<button id="achievementsTabBtn" type="button">🏆 Achievements</button>
-<div id="achievementsPanel" style="display:none;">
-  <div style="font-size:1.19em;color:#f7b000;font-weight:bold;margin-bottom:0.4em;">🏆 Achievements</div>
-  <div id="achievementsList"></div>
-  <button id="closeAchievementsPanelBtn" type="button">Close</button>
-</div>
     <div id="metaSettingsWrap">
       <div id="metaBox">
         <label for="metaSelect"><b>Meta:</b></label>
@@ -324,7 +299,7 @@
         <b>What does "Avoid trick questions" mean?</b><br>
         Some fast/charged move combinations (e.g. Extrasensory and Rock Tomb) always leave you with exactly 0 energy after each charged move, which means the answer for the 2nd, 3rd, etc. charged move is always exactly the same as the 1st (no leftover energy ever). When enabled, this setting avoids generating these repetitive, "trick" questions.
       </div>
-      <div id="metaWarn" ="color:#b00;font-size:0.98em;padding:0.1em 0 0.2em 0;"></div>
+      <div id="metaWarn" style="color:#b00;font-size:0.98em;padding:0.1em 0 0.2em 0;"></div>
       <div style="font-size:0.9em;color:#888;margin-top:0.2em;">
         <span>Metas loaded from <a href="https://github.com/Aeeriis/GoMovesQuiz/tree/main/rankings" target="_blank">GitHub rankings/</a> folder.</span>
       </div>
@@ -462,103 +437,6 @@
         `<b>Level Up!</b> You received a <b>${fruit.rarity} ${fruit.name}</b>!`;
       setTimeout(() => { div.textContent = ""; }, 5500);
     }
---- Achievements system for Pokémon Go Moveset Energy Quiz ---
-
-// 1. Define achievements
-const ACHIEVEMENTS = [
-  { key: "first_steps", icon: "🚶", label: "First Steps", desc: "Answer your first question" },
-  { key: "level5", icon: "🧗", label: "Getting Good", desc: "Reach Level 5" },
-  { key: "level15", icon: "🏆", label: "Quiz Master", desc: "Reach Level 15" },
-  { key: "lightning_fast", icon: "⚡", label: "Lightning Fast", desc: "Answer a question correctly in under 2 seconds" },
-  { key: "fruit_collector", icon: "🍉", label: "Fruit Collector", desc: "Collect your first fruit" },
-  { key: "rainbow_bag", icon: "🌈", label: "Rainbow Bag", desc: "Collect at least one fruit of each rarity" },
-  { key: "persistence", icon: "📅", label: "Persistence", desc: "Play on 5 different days" },
-  { key: "streak10", icon: "🔥", label: "Streaker", desc: "10 correct answers in a row in one session" }
-];
-
-// 2. Get and set achievement state in localStorage
-function getAchievementsState() {
-  try { return JSON.parse(localStorage.getItem("quizAchievements") || "{}"); }
-  catch(e){ return {}; }
-}
-function setAchievement(key) {
-  let state = getAchievementsState();
-  if (!state[key]) {
-    state[key] = { unlocked: true, date: new Date().toISOString().slice(0,10) };
-    localStorage.setItem("quizAchievements", JSON.stringify(state));
-    showAchievementsPanel(true);
-  }
-}
-
-// 3. Show achievements panel
-function showAchievementsPanel(justUnlocked) {
-  const listDiv = document.getElementById('achievementsList');
-  const state = getAchievementsState();
-  listDiv.innerHTML = "";
-  ACHIEVEMENTS.forEach(a=>{
-    const unlocked = !!state[a.key];
-    let date = unlocked ? "<div class='date'>Unlocked: "+state[a.key].date+"</div>" : "";
-    let div = document.createElement("div");
-    div.className = "achievement" + (unlocked ? " unlocked":"");
-    div.innerHTML = `<div class="icon">${a.icon}</div>
-    <div class="label">${a.label}</div>
-    <div class="desc">${a.desc}</div>
-    ${date}`;
-    listDiv.appendChild(div);
-  });
-  document.getElementById('achievementsPanel').style.display = '';
-  if (justUnlocked) document.getElementById('achievementsPanel').scrollIntoView({behavior:"smooth"});
-}
-
-// 4. Wire up Achievements button and close button after DOM is ready
-window.addEventListener("DOMContentLoaded", function() {
-  document.getElementById('achievementsTabBtn').onclick = ()=>showAchievementsPanel(false);
-  document.getElementById('closeAchievementsPanelBtn').onclick = ()=>{document.getElementById('achievementsPanel').style.display="none";};
-});
-
-// 5. Track correct streak for "Streaker"
-let correctStreak = 0;
-
-// 6. Check and unlock achievements after each answer
-function checkAchievementsOnSubmit(wasCorrect, elapsed, xpState, stats) {
-  // First Steps (must check after stats.total++)
-  if (stats.total >= 1) setAchievement("first_steps");
-  // Level 5/15
-  if (getLevelInfo(xpState.xp).level >= 5) setAchievement("level5");
-  if (getLevelInfo(xpState.xp).level >= 15) setAchievement("level15");
-  // Lightning Fast
-  if (wasCorrect && elapsed > 0 && elapsed < 2) setAchievement("lightning_fast");
-  // Fruit Collector
-  if (Object.values(xpState.fruitBag).reduce((a,b)=>a+b,0) >= 1) setAchievement("fruit_collector");
-  // Rainbow Bag
-  let have = {Common:0, Uncommon:0, Rare:0, Epic:0, Legendary:0};
-  for (let fruit of LEVELUP_REWARDS) {
-    if ((xpState.fruitBag[fruit.emoji]||0)>0) have[fruit.rarityKey]=1;
-  }
-  if (Object.values(have).every(x=>x>0)) setAchievement("rainbow_bag");
-  // Persistence (5 different days)
-  let playedDays = JSON.parse(localStorage.getItem("playedDays")||"[]");
-  let today = new Date().toISOString().slice(0,10);
-  if (!playedDays.includes(today)) { playedDays.push(today); localStorage.setItem("playedDays",JSON.stringify(playedDays)); }
-  if (playedDays.length>=5) setAchievement("persistence");
-  // Streaker (10 correct in a row)
-  if (wasCorrect) correctStreak++; else correctStreak=0;
-  if (correctStreak>=10) setAchievement("streak10");
-}
-
-// 7. Clear achievements on stats reset
-document.getElementById('resetStats').onclick = function() {
-  if (!window.confirm("Are you sure you want to reset your stats, XP, fruits, and achievements?")) return;
-  stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
-  saveStats();
-  showStats();
-  xpState = { xp: 0, fruitBag: {} };
-  saveXP();
-  showXP();
-  localStorage.removeItem("quizAchievements");
-  localStorage.removeItem("playedDays");
-  correctStreak = 0;
-};
     // -- Meta settings (CSV file list) --
     const metaCSVFILES = [
       { file: "cp1500_all_overall_rankings.csv", label: "Great" },
