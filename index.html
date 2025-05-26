@@ -318,11 +318,6 @@
     </div>
     <div id="levelstats"></div>
     <div id="xpstats"></div>
-    <div id="fruitTradeupWrap" style="margin-top:1em; text-align:center;">
-  <h3>Trade Up Fruits</h3>
-  <div id="tradeupOptions"></div>
-  <div id="tradeupMsg" style="color:#1864ab;margin-top:0.5em;"></div>
-  </div>
     <div id="levelupReward"></div>
     <div id="stats"></div>
     <div id="avgstats"></div>
@@ -377,26 +372,19 @@
       { emoji: "🤢", name: "Durian",       rarity: "🔴 Legendary", prob: 0.67, rarityKey: "Legendary" },
       { emoji: "🍫", name: "Cupuaçu",      rarity: "🔴 Legendary", prob: 0.66, rarityKey: "Legendary" }
     ];
-    const TRADEUP_RULES = {
-  Common:    { next: "Uncommon",   count: 5 },
-  Uncommon:  { next: "Rare",       count: 5 },
-  Rare:      { next: "Epic",       count: 3 },
-  Epic:      { next: "Legendary",  count: 3 }
-  // Legendary cannot be traded up
-};
     function calcXP(difficulty, onlyHighScore) {
-      let base = 12;
-      if (difficulty === "multi") base = 17;
-      else if (difficulty === "combo") base = 23;
-      if (onlyHighScore) base = Math.round(base * 0.9);
+      let base = 7;
+      if (difficulty === "multi") base = 12;
+      else if (difficulty === "combo") base = 18;
+      if (onlyHighScore) base = Math.round(base * 0.67);
       return base;
     }
     function getLevelInfo(xp) {
-      let level = 1, total = 0, next = 35;
+      let level = 1, total = 0, next = 50;
       while (xp >= total + next) {
         total += next;
         level++;
-        next = level * 40;
+        next = level * 50;
       }
       return { level, xpInLevel: xp - total, xpToNext: next - (xp - total), xpForNext: next };
     }
@@ -423,48 +411,6 @@
         Epic: "🟠 Epic",
         Legendary: "🔴 Legendary"
       };
-      function updateTradeupOptions() {
-        const tradeDiv = document.getElementById('tradeupOptions');
-        tradeDiv.innerHTML = '';
-        let anyOption = false;
-        for (let rarity in TRADEUP_RULES) {
-          const rule = TRADEUP_RULES[rarity];
-    // Find all fruits of this rarity in bag
-          const fruits = LEVELUP_REWARDS.filter(f => f.rarityKey === rarity);
-          let total = fruits.reduce((sum, f) => sum + (xpState.fruitBag[f.emoji] || 0), 0);
-          if (total >= rule.count) {
-              anyOption = true;
-              let btn = document.createElement('button');
-              btn.textContent = `Trade ${rule.count} ${rarity} fruits → 1 ${rule.next}`;
-              btn.onclick = function() {
-        // Remove fruits from bag
-                  let needed = rule.count;
-                  for (let f of fruits) {
-                    let have = xpState.fruitBag[f.emoji] || 0;
-                    let take = Math.min(needed, have);
-                    xpState.fruitBag[f.emoji] = have - take;
-                    needed -= take;
-                    if (xpState.fruitBag[f.emoji] <= 0) delete xpState.fruitBag[f.emoji];
-                    if (needed <= 0) break;
-        }
-        // Add higher-rarity fruit (pick random of next rarity)
-                  let higher = LEVELUP_REWARDS.filter(f => f.rarityKey === rule.next);
-                  let pick = higher[Math.floor(Math.random() * higher.length)];
-                  xpState.fruitBag[pick.emoji] = (xpState.fruitBag[pick.emoji] || 0) + 1;
-                  saveXP();
-                  showXP();
-                  updateTradeupOptions();
-                  document.getElementById('tradeupMsg').textContent = `🎉 Traded up for a ${pick.emoji} ${pick.name}!`;
-                  setTimeout(() => { document.getElementById('tradeupMsg').textContent = ""; }, 3000);
-      };
-              tradeDiv.appendChild(btn);
-              tradeDiv.appendChild(document.createElement('br'));
-    }
-  }
-          if (!anyOption) {
-            tradeDiv.textContent = "No available trades.";
-  }
-}
       let bagByRarity = {};
       for (let fruit of LEVELUP_REWARDS) {
         let count = xpState.fruitBag[fruit.emoji] || 0;
@@ -478,14 +424,14 @@
         let fruitsHTML = arr.map(f =>
           `<span title="${f.name}" style="font-size:1.4em;margin-right:0.05em">${f.emoji}×${f.count}</span>`
         ).join(" ");
-        return `<><span style="font-size:1.04em">${rarityTitles[rarity]}:</span> ${fruitsHTML}</>`;
+        return `<div><span style="font-size:1.04em">${rarityTitles[rarity]}:</span> ${fruitsHTML}</div>`;
       }).join("");
       document.getElementById('xpstats').innerHTML =
-        bagHTML ? `< style="margin-top:0.2em">${bagHTML}</>` : "";
+        bagHTML ? `<div style="margin-top:0.2em">${bagHTML}</div>` : "";
     }
     function showLevelupReward(fruit) {
-      let  = document.getElementById("levelupReward");
-      if (!fruit) { .textContent = ""; return; }
+      let div = document.getElementById("levelupReward");
+      if (!fruit) { div.textContent = ""; return; }
       div.innerHTML =
         `<span style="font-size:2em;">${fruit.emoji}</span><br>` +
         `<b>Level Up!</b> You received a <b>${fruit.rarity} ${fruit.name}</b>!`;
@@ -623,7 +569,6 @@
     }
     showStats();
     showXP();
-    updateTradeupOptions();
     let timerStart = null, timerInterval = null, timerActive = false;
     const timerSpan = document.getElementById('timer');
     const timerBox = document.getElementById('timerBox');
@@ -682,7 +627,6 @@
       xpState = { xp: 0, fruitBag: {} };
       saveXP();
       showXP();
-      updateTradeupOptions();
     };
     function getOrdinalText(n) {
       return ["1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th"][n-1] || (n+"th");
@@ -774,7 +718,6 @@
       document.getElementById('quizSection').classList.remove('hidden');
       showStats();
       showXP();
-      updateTradeupOptions();
       populateMetaMenu();
     });
     function parseCSV(data) {
@@ -1086,14 +1029,12 @@
         let newLevel = getLevelInfo(xpState.xp).level;
         saveXP();
         showXP();
-        updateTradeupOptions();
         if (newLevel > prevLevel) {
           let fruit = getRandomFruitReward();
           if (!xpState.fruitBag[fruit.emoji]) xpState.fruitBag[fruit.emoji] = 0;
           xpState.fruitBag[fruit.emoji]++;
           saveXP();
           showXP();
-          updateTradeupOptions();
           showLevelupReward(fruit);
         } else {
           showLevelupReward(null);
