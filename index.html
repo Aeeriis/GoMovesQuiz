@@ -318,6 +318,14 @@
     </div>
     <div id="levelstats"></div>
     <div id="xpstats"></div>
+    <div id="tradeupSection" style="margin:1em 0; text-align:center;">
+      <b>Trade Up Fruits</b><br>
+      <button id="tradeCommon" style="margin:0.2em;">5×🟢 Common → 1×🔵 Uncommon</button>
+      <button id="tradeUncommon" style="margin:0.2em;">5×🔵 Uncommon → 1×🟣 Rare</button>
+      <button id="tradeRare" style="margin:0.2em;">3×🟣 Rare → 1×🟠 Epic</button>
+      <button id="tradeEpic" style="margin:0.2em;">3×🟠 Epic → 1×🔴 Legendary</button>
+      <div id="tradeupMsg" style="color:#1864ab;font-size:0.97em;margin-top:0.5em;"></div>
+    </div>
     <div id="levelupReward"></div>
     <div id="stats"></div>
     <div id="avgstats"></div>
@@ -371,6 +379,12 @@
       { emoji: "🍄", name: "Miracle Fruit",rarity: "🔴 Legendary", prob: 0.67, rarityKey: "Legendary" },
       { emoji: "🤢", name: "Durian",       rarity: "🔴 Legendary", prob: 0.67, rarityKey: "Legendary" },
       { emoji: "🍫", name: "Cupuaçu",      rarity: "🔴 Legendary", prob: 0.66, rarityKey: "Legendary" }
+    ];
+    const TRADEUP_MAP = [
+      { from: "Common", to: "Uncommon", cost: 5 },
+      { from: "Uncommon", to: "Rare", cost: 5 },
+      { from: "Rare", to: "Epic", cost: 3 },
+      { from: "Epic", to: "Legendary", cost: 3 }
     ];
     function calcXP(difficulty, onlyHighScore) {
       let base = 7;
@@ -1055,6 +1069,52 @@
       newQuestion();
     };
     document.getElementById('nextQuestion').style.display = "none";
+    function getFruitEmojisByRarity(rarityKey) {
+      return LEVELUP_REWARDS.filter(f => f.rarityKey === rarityKey).map(f => f.emoji);
+    }
+    function getRandomFruitByRarity(rarityKey) {
+      const fruits = LEVELUP_REWARDS.filter(f => f.rarityKey === rarityKey);
+      return fruits[Math.floor(Math.random() * fruits.length)];
+    }
+    function tryTradeUp(fromKey, toKey, cost) {
+  // Count total "from" fruits
+      let fromEmojis = getFruitEmojisByRarity(fromKey);
+      let total = fromEmojis.reduce((sum, emoji) => sum + (xpState.fruitBag[emoji] || 0), 0);
+      if (total < cost) {
+        return `Not enough ${fromKey} fruits!`;
+      }
+  // Remove fruits (evenly or randomly)
+      let toRemove = cost;
+      for (let emoji of fromEmojis) {
+        let avail = xpState.fruitBag[emoji] || 0;
+        let remove = Math.min(avail, toRemove);
+        if (remove > 0) {
+          xpState.fruitBag[emoji] = avail - remove;
+          toRemove -= remove;
+          if (xpState.fruitBag[emoji] === 0) delete xpState.fruitBag[emoji];
+          if (toRemove === 0) break;
+        }
+      }
+  // Add one higher rarity fruit
+      let newFruit = getRandomFruitByRarity(toKey);
+      if (!xpState.fruitBag[newFruit.emoji]) xpState.fruitBag[newFruit.emoji] = 0;
+      xpState.fruitBag[newFruit.emoji]++;
+      saveXP();
+      showXP();
+      return `Traded up to <span style="font-size:1.2em">${newFruit.emoji}</span> <b>${newFruit.name}</b>!`;
+    }
+    document.getElementById('tradeCommon').onclick = function() {
+      document.getElementById('tradeupMsg').innerHTML = tryTradeUp("Common", "Uncommon", 5);
+    };
+    document.getElementById('tradeUncommon').onclick = function() {
+      document.getElementById('tradeupMsg').innerHTML = tryTradeUp("Uncommon", "Rare", 5);
+    };
+    document.getElementById('tradeRare').onclick = function() {
+      document.getElementById('tradeupMsg').innerHTML = tryTradeUp("Rare", "Epic", 5);
+    };
+    document.getElementById('tradeEpic').onclick = function() {
+      document.getElementById('tradeupMsg').innerHTML = tryTradeUp("Epic", "Legendary", 5);
+    };
   </script>
 </body>
 </html>
