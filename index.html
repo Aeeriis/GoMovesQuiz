@@ -250,6 +250,7 @@
       <b>Disclaimer:</b> This entire app was created by AI (GitHub Copilot). All gameplay and meta data used here are from <a href="https://pvpoke.com" target="_blank" rel="noopener">pvpoke.com</a>.
     </div>
     <h1>Pokémon Go Moveset Energy Quiz</h1>
+    <button id="openTradeupMenu" style="margin:0.5em 0;">Fruit Bag & Trade Up</button>
     <div id="intro-explanation">
       <b>How the quiz works:</b>
       <ul>
@@ -318,13 +319,21 @@
     </div>
     <div id="levelstats"></div>
     <div id="xpstats"></div>
-    <div id="tradeupSection" style="margin:1em 0; text-align:center;">
-      <b>Trade Up Fruits</b><br>
-      <button id="tradeCommon" style="margin:0.2em;">5×🟢 Common → 1×🔵 Uncommon</button>
-      <button id="tradeUncommon" style="margin:0.2em;">5×🔵 Uncommon → 1×🟣 Rare</button>
-      <button id="tradeRare" style="margin:0.2em;">3×🟣 Rare → 1×🟠 Epic</button>
-      <button id="tradeEpic" style="margin:0.2em;">3×🟠 Epic → 1×🔴 Legendary</button>
-      <div id="tradeupMsg" style="color:#1864ab;font-size:0.97em;margin-top:0.5em;"></div>
+    <div id="tradeupModal" style="
+      display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; 
+      background:rgba(0,0,0,0.4); z-index:9999; align-items:center; justify-content:center;">
+      <div style="
+        background:#fff; border-radius:10px; max-width:350px; margin:auto; padding:1.2em; box-shadow:0 8px 32px #0004; position:relative;">
+        <button id="closeTradeupMenu" style="position:absolute; right:0.7em; top:0.7em; font-size:1.4em; background:none; border:none; color:#666; cursor:pointer;">×</button>
+        <div id="tradeupSection" style="text-align:center;">
+          <b>Trade Up Fruits</b><br>
+          <button id="tradeCommon" style="margin:0.2em;">5×🟢 Common → 1×🔵 Uncommon</button>
+          <button id="tradeUncommon" style="margin:0.2em;">5×🔵 Uncommon → 1×🟣 Rare</button>
+          <button id="tradeRare" style="margin:0.2em;">5×🟣 Rare → 1×🟠 Epic</button>
+          <button id="tradeEpic" style="margin:0.2em;">5×🟠 Epic → 1×🔴 Legendary</button>
+          <div id="tradeupMsg" style="color:#1864ab;font-size:0.97em;margin-top:0.5em;"></div>
+        </div>
+      </div>
     </div>
     <div id="levelupReward"></div>
     <div id="stats"></div>
@@ -1114,6 +1123,16 @@
     };
     document.getElementById('tradeEpic').onclick = function() {
       document.getElementById('tradeupMsg').innerHTML = tryTradeUp("Epic", "Legendary", 5);
+    };
+    document.getElementById('openTradeupMenu').onclick = function() {
+      document.getElementById('tradeupModal').style.display = "flex";
+    };
+    document.getElementById('closeTradeupMenu').onclick = function() {
+      document.getElementById('tradeupModal').style.display = "none";
+    };
+    // Optional: Close modal when background is clicked
+    document.getElementById('tradeupModal').onclick = function(e) {
+      if (e.target === this) this.style.display = "none";
     };
   </script>
 </body>
