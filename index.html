@@ -251,6 +251,7 @@
     </div>
     <h1>Pokémon Go Moveset Energy Quiz</h1>
     <button id="openTradeupMenu" style="margin:0.5em 0;">Fruit Trade Up</button>
+    <button id="openFruitEncyclopedia" style="margin:0.5em 0;">Fruit Encyclopedia</button>
     <div id="intro-explanation">
       <b>How the quiz works:</b>
       <ul>
@@ -332,6 +333,16 @@
           <button id="tradeRare" style="margin:0.2em;">5×🟣 Rare → 1×🟠 Epic</button>
           <button id="tradeEpic" style="margin:0.2em;">5×🟠 Epic → 1×🔴 Legendary</button>
           <div id="tradeupMsg" style="color:#1864ab;font-size:0.97em;margin-top:0.5em;"></div>
+        </div>
+      </div>
+    </div>
+    <div id="fruitEncyclopediaModal" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; 
+      background:rgba(0,0,0,0.4); z-index:9999; align-items:center; justify-content:center;">
+      <div style="background:#fff; border-radius:10px; max-width:420px; margin:auto; padding:1.2em; box-shadow:0 8px 32px #0004; position:relative;">
+        <button id="closeFruitEncyclopedia" style="position:absolute; right:0.7em; top:0.7em; font-size:1.4em; background:none; border:none; color:#666; cursor:pointer;">×</button>
+        <div style="font-size:1.3em; font-weight:bold; text-align:center;">Fruit Encyclopedia</div>
+        <div id="fruitEncyclopediaBody" style="margin-top:1.3em; font-size:1.18em; text-align:center;">
+          <!-- Content rendered by JS -->
         </div>
       </div>
     </div>
@@ -1132,6 +1143,43 @@
     };
     // Optional: Close modal when background is clicked
     document.getElementById('tradeupModal').onclick = function(e) {
+      if (e.target === this) this.style.display = "none";
+    };
+    function renderFruitEncyclopedia() {
+      let html = '';
+  // Group fruits by rarity for display
+      let rarityOrder = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
+      let rarityTitles = {
+        Common: "🟢 Common",
+        Uncommon: "🔵 Uncommon",
+        Rare: "🟣 Rare",
+        Epic: "🟠 Epic",
+        Legendary: "🔴 Legendary"
+      };
+      for (let rarity of rarityOrder) {
+        let group = LEVELUP_REWARDS.filter(f => f.rarityKey === rarity);
+        if (!group.length) continue;
+        html += `<div style="margin:0.8em 0 0.2em 0; font-weight:bold;">${rarityTitles[rarity]}:</div>`;
+        html += group.map(fruit => {
+          let discovered = (xpState.fruitBag[fruit.emoji] || 0) > 0;
+          return `<span style="display:inline-block; min-width:3em; margin:0.18em 0.18em 0.45em 0.18em; text-align:center;">
+            <span style="font-size:2em;">${discovered ? fruit.emoji : "❓"}</span><br>
+            <span style="font-size:0.96em; color:#333;">${discovered ? fruit.name : "???"}</span>
+          </span>`;
+        }).join('');
+      }
+      document.getElementById('fruitEncyclopediaBody').innerHTML = html;
+    }
+// Open/close handlers
+    document.getElementById('openFruitEncyclopedia').onclick = function() {
+      renderFruitEncyclopedia();
+      document.getElementById('fruitEncyclopediaModal').style.display = "flex";
+    };
+    document.getElementById('closeFruitEncyclopedia').onclick = function() {
+      document.getElementById('fruitEncyclopediaModal').style.display = "none";
+    };
+    // Optional: close when clicking background
+    document.getElementById('fruitEncyclopediaModal').onclick = function(e) {
       if (e.target === this) this.style.display = "none";
     };
   </script>
