@@ -249,6 +249,9 @@
     <div class="disclaimer">
       <b>Disclaimer:</b> This entire app was created by AI (GitHub Copilot). All gameplay and meta data used here are from <a href="https://pvpoke.com" target="_blank" rel="noopener">pvpoke.com</a>.
     </div>
+    <!-- Login Button and User Info -->
+    <button id="loginBtn">Sign in with Google</button>
+    <span id="userInfo"></span>
     <h1>Pokémon Go Moveset Energy Quiz</h1>
     <button id="openTradeupMenu" style="margin:0.5em 0;">Fruit Trade Up</button>
     <button id="openFruitEncyclopedia" style="margin:0.5em 0;">Fruit Encyclopedia</button>
@@ -378,6 +381,7 @@
   <!-- Add these scripts just before your closing </body> tag, or BEFORE any code that uses Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
 <script>
   // Your web app's Firebase configuration (from your screenshot)
   const firebaseConfig = {
@@ -421,6 +425,75 @@
       });
   }
 </script>
+  <script>
+      // --- Firebase Initialization ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyAA0yCw8v0WUtDp13Qs_55tmIZXJUFcI3o",
+      authDomain: "gomovesquiz-d0e8e.firebaseapp.com",
+      databaseURL: "https://gomovesquiz-d0e8e-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "gomovesquiz-d0e8e",
+      storageBucket: "gomovesquiz-d0e8e.appspot.com",
+      messagingSenderId: "105342911635",
+      appId: "1:105342911635:web:4298b9d345fc1255b97966",
+      measurementId: "G-TSZNRZQ83H"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const auth = firebase.auth();
+
+  // --- Google Sign In ---
+    document.getElementById('loginBtn').onclick = function() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider)
+        .then(result => {
+          document.getElementById('userInfo').textContent = `Signed in as ${result.user.displayName}`;
+        })
+        .catch(error => {
+          alert(error.message);
+        });
+    };
+    auth.onAuthStateChanged(user => {
+      if(user) {
+        document.getElementById('userInfo').textContent = `Signed in as ${user.displayName}`;
+        document.getElementById('loginBtn').style.display = 'none';
+      } else {
+        document.getElementById('userInfo').textContent = '';
+        document.getElementById('loginBtn').style.display = '';
+      }
+    });
+
+  // --- Submit Score with User Info ---
+    function submitScore(score) {
+      const user = auth.currentUser;
+      if (!user) {
+        alert("Sign in first!");
+        return;
+      }
+      db.ref('leaderboard').push({
+        username: user.displayName,
+        uid: user.uid,
+        score: score,
+        timestamp: Date.now()
+      });
+    }
+
+  // --- Real-Time Leaderboard ---
+    function listenToLeaderboard() {
+      db.ref('leaderboard')
+        .orderByChild('score')
+        .limitToLast(10)
+        .on('value', snapshot => {
+          let entries = [];
+          snapshot.forEach(child => entries.push(child.val()));
+          entries.sort((a, b) => b.score - a.score);
+          document.getElementById('leaderboardList').innerHTML = entries.map(
+            (entry, idx) => `<li>#${idx+1} ${entry.username}: ${entry.score}</li>`
+          ).join('');
+        });
+    }
+  // Start listening when page loads
+    listenToLeaderboard();
+  </script>
   <script>
     // --- ANTI-FARMING STATE ---
     // This flag determines if XP has already been awarded for the current question
