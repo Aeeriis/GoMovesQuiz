@@ -252,6 +252,20 @@
     <h1>Pokémon Go Moveset Energy Quiz</h1>
     <button id="openTradeupMenu" style="margin:0.5em 0;">Fruit Trade Up</button>
     <button id="openFruitEncyclopedia" style="margin:0.5em 0;">Fruit Encyclopedia</button>
+    <!-- Add this in your HTML, e.g. below the Fruit Encyclopedia button: -->
+    <button id="openDailyChallenge" style="margin:0.5em 0;">Daily Challenge 🍀</button>
+
+    <!-- Daily Challenge Modal -->
+    <div id="dailyChallengeModal" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; 
+      background:rgba(0,0,0,0.4); z-index:9999; align-items:center; justify-content:center;">
+      <div style="background:#fff; border-radius:10px; max-width:430px; margin:auto; padding:1.2em; box-shadow:0 8px 32px #0004; position:relative;">
+        <button id="closeDailyChallenge" style="position:absolute; right:0.7em; top:0.7em; font-size:1.4em; background:none; border:none; color:#666; cursor:pointer;">×</button>
+        <div style="font-size:1.3em; font-weight:bold; text-align:center; margin-bottom:0.6em;">Daily Challenge 🍀</div>
+        <div id="dailyChallengeBody" style="margin-top:0.3em; font-size:1.13em; text-align:center;">
+      <!-- Filled by JS -->
+        </div>
+      </div>
+    </div>
     <div id="intro-explanation">
       <b>How the quiz works:</b>
       <ul>
@@ -1263,6 +1277,111 @@
       if (document.getElementById('fruitEncyclopediaModal')?.style.display === "flex") renderFruitEncyclopedia();
       return `Traded up to <span style="font-size:1.2em">${newFruit.emoji}</span> <b>${newFruit.name}</b>!`;
     }
+    // --- Daily Challenge Logic ---
+
+// Track today's date as YYYY-MM-DD
+function getTodayStr() {
+  let d = new Date(), m = d.getMonth()+1, day = d.getDate();
+  return `${d.getFullYear()}-${m<10?'0':''}${m}-${day<10?'0':''}${day}`;
+}
+
+// Storage for daily challenge (date, completed, fruit)
+let dailyChallengeState = JSON.parse(localStorage.getItem('dailyChallenge') || '{}');
+function saveDailyChallenge() {
+  localStorage.setItem('dailyChallenge', JSON.stringify(dailyChallengeState));
+}
+
+// Button handlers
+document.getElementById('openDailyChallenge').onclick = function() {
+  renderDailyChallenge();
+  document.getElementById('dailyChallengeModal').style.display = "flex";
+};
+document.getElementById('closeDailyChallenge').onclick = function() {
+  document.getElementById('dailyChallengeModal').style.display = "none";
+};
+document.getElementById('dailyChallengeModal').onclick = function(e) {
+  if (e.target === this) this.style.display = "none";
+};
+
+// --- Challenge Generation ---
+
+// Store the daily challenge question, answer, and reward for the day
+function getOrCreateTodayChallenge() {
+  let today = getTodayStr();
+  if (dailyChallengeState.date !== today) {
+    // Generate a fresh challenge (reuse your existing random question logic)
+    let poke = pickEligiblePokemon();
+    if (!poke) return null;
+    let fastList = getPreferredOrAllFastMoves(poke);
+    let chargeList = getPreferredOrAllChargeMoves(poke);
+    let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+    let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
+    let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, 1);
+
+    // Pick a random fruit, at least Uncommon (guaranteed, or you can change this logic)
+    let possibleFruits = LEVELUP_REWARDS.filter(f => ["Uncommon", "Rare", "Epic", "Legendary"].includes(f.rarityKey));
+    let fruit = possibleFruits[Math.floor(Math.random() * possibleFruits.length)];
+
+    dailyChallengeState = {
+      date: today,
+      question: `How many "${fast.Move}" (Fast) are needed for the 1st "${charge.Move}" (Charged) for ${poke.speciesName}?`,
+      answer: needed,
+      fastMove: fast.Move,
+      chargeMove: charge.Move,
+      pokemon: poke.speciesName,
+      fruit: fruit,
+      completed: false
+    };
+    saveDailyChallenge();
+  }
+  return dailyChallengeState;
+}
+
+// --- Challenge UI ---
+
+function renderDailyChallenge() {
+  let state = getOrCreateTodayChallenge();
+  if (!state) {
+    document.getElementById('dailyChallengeBody').innerHTML = "No eligible Pokémon for today's challenge.";
+    return;
+  }
+  if (state.completed) {
+    document.getElementById('dailyChallengeBody').innerHTML =
+      `✅ <b>Complete!</b><br><br>You earned: <span style="font-size:2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b><br><br>
+      Come back tomorrow for a new challenge!`;
+    return;
+  }
+  // Render question + answer form
+  document.getElementById('dailyChallengeBody').innerHTML =
+    `<div style="margin-bottom:0.9em">${state.question}</div>
+    <form id="dailyChallengeForm">
+      <input type="number" id="dailyChallengeAnswer" min="1" required autocomplete="off" style="width:7em;font-size:1.2em;" />
+      <button type="submit">Submit</button>
+    </form>
+    <div id="dailyChallengeResult" style="margin-top:0.7em; font-weight:bold;"></div>`;
+  document.getElementById('dailyChallengeForm').onsubmit = function(e) {
+    e.preventDefault();
+    let ans = parseInt(document.getElementById('dailyChallengeAnswer').value, 10);
+    let correct = (ans === state.answer);
+    let resultDiv = document.getElementById('dailyChallengeResult');
+    if (correct) {
+      // Award fruit, mark complete, update user inventory
+      state.completed = true;
+      if (!xpState.fruitBag[state.fruit.emoji]) xpState.fruitBag[state.fruit.emoji] = 0;
+      xpState.fruitBag[state.fruit.emoji]++;
+      xpState.discoveredFruits[state.fruit.emoji] = true;
+      saveXP();
+      saveDailyChallenge();
+      showXP();
+      renderFruitEncyclopedia && renderFruitEncyclopedia();
+      resultDiv.innerHTML =
+        `🎉 <b>Correct!</b> You earned <span style="font-size:1.2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b>!`;
+      setTimeout(renderDailyChallenge, 1800); // Update UI after short delay
+    } else {
+      resultDiv.innerHTML = `❌ Incorrect. Try again!`;
+    }
+  };
+}
   </script>
 </body>
 </html>
