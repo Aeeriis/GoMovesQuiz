@@ -1120,18 +1120,6 @@
       showXP();
       return `Traded up to <span style="font-size:1.2em">${newFruit.emoji}</span> <b>${newFruit.name}</b>!`;
     }
-    document.getElementById('tradeCommon').onclick = function() {
-      document.getElementById('tradeupMsg').innerHTML = tryTradeUp("Common", "Uncommon", 5);
-    };
-    document.getElementById('tradeUncommon').onclick = function() {
-      document.getElementById('tradeupMsg').innerHTML = tryTradeUp("Uncommon", "Rare", 5);
-    };
-    document.getElementById('tradeRare').onclick = function() {
-      document.getElementById('tradeupMsg').innerHTML = tryTradeUp("Rare", "Epic", 5);
-    };
-    document.getElementById('tradeEpic').onclick = function() {
-      document.getElementById('tradeupMsg').innerHTML = tryTradeUp("Epic", "Legendary", 5);
-    };
     document.getElementById('openTradeupMenu').onclick = function() {
       renderTradeupTiers(); // <-- this will render the fruit picker UI
       document.getElementById('tradeupModal').style.display = "flex";
