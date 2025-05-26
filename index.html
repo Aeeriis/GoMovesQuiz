@@ -1277,21 +1277,162 @@
       if (document.getElementById('fruitEncyclopediaModal')?.style.display === "flex") renderFruitEncyclopedia();
       return `Traded up to <span style="font-size:1.2em">${newFruit.emoji}</span> <b>${newFruit.name}</b>!`;
     }
-    // --- Daily Challenge Logic ---
+// --- Daily Challenge: 10 Questions, Retry on Failure ---
 
-// Track today's date as YYYY-MM-DD
 function getTodayStr() {
   let d = new Date(), m = d.getMonth()+1, day = d.getDate();
   return `${d.getFullYear()}-${m<10?'0':''}${m}-${day<10?'0':''}${day}`;
 }
 
-// Storage for daily challenge (date, completed, fruit)
 let dailyChallengeState = JSON.parse(localStorage.getItem('dailyChallenge') || '{}');
 function saveDailyChallenge() {
   localStorage.setItem('dailyChallenge', JSON.stringify(dailyChallengeState));
 }
 
-// Button handlers
+// Generate a single challenge question (reuses your logic)
+function generateChallengeQuestion() {
+  let poke = pickEligiblePokemon();
+  if (!poke) return null;
+  let fastList = getPreferredOrAllFastMoves(poke);
+  let chargeList = getPreferredOrAllChargeMoves(poke);
+  let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
+  let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
+  let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, 1);
+  return {
+    question: `How many "${fast.Move}" (Fast) are needed for the 1st "${charge.Move}" (Charged) for ${poke.speciesName}?`,
+    answer: needed,
+    fastMove: fast.Move,
+    chargeMove: charge.Move,
+    pokemon: poke.speciesName,
+    fast,
+    charge,
+    poke
+  };
+}
+
+// Pick a reward fruit (Uncommon+)
+function pickDailyFruit() {
+  let pool = LEVELUP_REWARDS.filter(f => ["Uncommon", "Rare", "Epic", "Legendary"].includes(f.rarityKey));
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// Generate a challenge state for today (10 questions, new reward)
+function generateNewChallengeForToday() {
+  let today = getTodayStr();
+  let questions = [];
+  for (let i = 0; i < 10; ++i) {
+    let q = generateChallengeQuestion();
+    // If something went wrong, bail out
+    if (!q) break;
+    questions.push(q);
+  }
+  let fruit = pickDailyFruit();
+  dailyChallengeState = {
+    date: today,
+    questions,
+    progress: 0,
+    failed: false,
+    completed: false,
+    fruit,
+    fruitClaimed: dailyChallengeState.fruitClaimed || false // persist fruitClaimed flag for the day
+  };
+  saveDailyChallenge();
+  return dailyChallengeState;
+}
+
+// On opening, initialize today's challenge if needed, or reuse
+function getOrCreateTodayChallenge10() {
+  let today = getTodayStr();
+  if (dailyChallengeState.date !== today || !dailyChallengeState.questions || dailyChallengeState.questions.length !== 10) {
+    return generateNewChallengeForToday();
+  }
+  return dailyChallengeState;
+}
+
+function renderDailyChallenge() {
+  let state = getOrCreateTodayChallenge10();
+  let body = document.getElementById('dailyChallengeBody');
+
+  // If fruit was already claimed for today, lock challenge
+  if (state.fruitClaimed) {
+    body.innerHTML =
+      `🎉 <b>Complete!</b><br><br>You earned: <span style="font-size:2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b><br>
+      Come back tomorrow for a new challenge!`;
+    return;
+  }
+  // If challenge failed
+  if (state.failed) {
+    body.innerHTML =
+      `❌ <b>Challenge failed!</b><br><br>
+      You missed a question.<br>
+      <button id="dailyChallengeRetryBtn" style="margin-top:1em;">Try Again (New Questions)</button>`;
+    document.getElementById('dailyChallengeRetryBtn').onclick = function() {
+      generateNewChallengeForToday();
+      renderDailyChallenge();
+    };
+    return;
+  }
+  // If questions could not be generated
+  if (!state.questions || state.questions.length !== 10) {
+    body.innerHTML = "No eligible Pokémon for today's challenge.";
+    return;
+  }
+
+  // If challenge complete but fruit not yet claimed
+  if (state.completed && !state.fruitClaimed) {
+    // Award fruit if not already given for today
+    state.fruitClaimed = true;
+    if (!xpState.fruitBag[state.fruit.emoji]) xpState.fruitBag[state.fruit.emoji] = 0;
+    xpState.fruitBag[state.fruit.emoji]++;
+    xpState.discoveredFruits[state.fruit.emoji] = true;
+    saveXP();
+    showXP();
+    renderFruitEncyclopedia && renderFruitEncyclopedia();
+    saveDailyChallenge();
+    body.innerHTML =
+      `🎉 <b>Complete!</b><br><br>You earned: <span style="font-size:2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b><br>
+      Come back tomorrow for a new challenge!`;
+    return;
+  }
+
+  // Normal progress
+  let qNum = state.progress + 1;
+  let q = state.questions[state.progress];
+  body.innerHTML =
+    `<div style="margin-bottom:0.5em;">Question ${qNum} of 10</div>
+     <div style="margin-bottom:0.9em">${q.question}</div>
+     <form id="dailyChallengeForm">
+      <input type="number" id="dailyChallengeAnswer" min="1" required autocomplete="off" style="width:7em;font-size:1.2em;" />
+      <button type="submit">Submit</button>
+     </form>
+     <div id="dailyChallengeResult" style="margin-top:0.7em; font-weight:bold;"></div>`;
+
+  document.getElementById('dailyChallengeForm').onsubmit = function(e) {
+    e.preventDefault();
+    let ans = parseInt(document.getElementById('dailyChallengeAnswer').value, 10);
+    let correct = (ans === q.answer);
+    let resultDiv = document.getElementById('dailyChallengeResult');
+    if (correct) {
+      resultDiv.innerHTML = `✅ Correct!`;
+      state.progress++;
+      if (state.progress === 10) {
+        state.completed = true;
+        saveDailyChallenge();
+        setTimeout(renderDailyChallenge, 800);
+        return;
+      }
+      saveDailyChallenge();
+      setTimeout(renderDailyChallenge, 500);
+    } else {
+      resultDiv.innerHTML = `❌ Incorrect. Challenge failed!`;
+      state.failed = true;
+      saveDailyChallenge();
+      setTimeout(renderDailyChallenge, 800);
+    }
+  };
+}
+
+// UI handlers
 document.getElementById('openDailyChallenge').onclick = function() {
   renderDailyChallenge();
   document.getElementById('dailyChallengeModal').style.display = "flex";
@@ -1302,86 +1443,6 @@ document.getElementById('closeDailyChallenge').onclick = function() {
 document.getElementById('dailyChallengeModal').onclick = function(e) {
   if (e.target === this) this.style.display = "none";
 };
-
-// --- Challenge Generation ---
-
-// Store the daily challenge question, answer, and reward for the day
-function getOrCreateTodayChallenge() {
-  let today = getTodayStr();
-  if (dailyChallengeState.date !== today) {
-    // Generate a fresh challenge (reuse your existing random question logic)
-    let poke = pickEligiblePokemon();
-    if (!poke) return null;
-    let fastList = getPreferredOrAllFastMoves(poke);
-    let chargeList = getPreferredOrAllChargeMoves(poke);
-    let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
-    let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
-    let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, 1);
-
-    // Pick a random fruit, at least Uncommon (guaranteed, or you can change this logic)
-    let possibleFruits = LEVELUP_REWARDS.filter(f => ["Uncommon", "Rare", "Epic", "Legendary"].includes(f.rarityKey));
-    let fruit = possibleFruits[Math.floor(Math.random() * possibleFruits.length)];
-
-    dailyChallengeState = {
-      date: today,
-      question: `How many "${fast.Move}" (Fast) are needed for the 1st "${charge.Move}" (Charged) for ${poke.speciesName}?`,
-      answer: needed,
-      fastMove: fast.Move,
-      chargeMove: charge.Move,
-      pokemon: poke.speciesName,
-      fruit: fruit,
-      completed: false
-    };
-    saveDailyChallenge();
-  }
-  return dailyChallengeState;
-}
-
-// --- Challenge UI ---
-
-function renderDailyChallenge() {
-  let state = getOrCreateTodayChallenge();
-  if (!state) {
-    document.getElementById('dailyChallengeBody').innerHTML = "No eligible Pokémon for today's challenge.";
-    return;
-  }
-  if (state.completed) {
-    document.getElementById('dailyChallengeBody').innerHTML =
-      `✅ <b>Complete!</b><br><br>You earned: <span style="font-size:2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b><br><br>
-      Come back tomorrow for a new challenge!`;
-    return;
-  }
-  // Render question + answer form
-  document.getElementById('dailyChallengeBody').innerHTML =
-    `<div style="margin-bottom:0.9em">${state.question}</div>
-    <form id="dailyChallengeForm">
-      <input type="number" id="dailyChallengeAnswer" min="1" required autocomplete="off" style="width:7em;font-size:1.2em;" />
-      <button type="submit">Submit</button>
-    </form>
-    <div id="dailyChallengeResult" style="margin-top:0.7em; font-weight:bold;"></div>`;
-  document.getElementById('dailyChallengeForm').onsubmit = function(e) {
-    e.preventDefault();
-    let ans = parseInt(document.getElementById('dailyChallengeAnswer').value, 10);
-    let correct = (ans === state.answer);
-    let resultDiv = document.getElementById('dailyChallengeResult');
-    if (correct) {
-      // Award fruit, mark complete, update user inventory
-      state.completed = true;
-      if (!xpState.fruitBag[state.fruit.emoji]) xpState.fruitBag[state.fruit.emoji] = 0;
-      xpState.fruitBag[state.fruit.emoji]++;
-      xpState.discoveredFruits[state.fruit.emoji] = true;
-      saveXP();
-      saveDailyChallenge();
-      showXP();
-      renderFruitEncyclopedia && renderFruitEncyclopedia();
-      resultDiv.innerHTML =
-        `🎉 <b>Correct!</b> You earned <span style="font-size:1.2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b>!`;
-      setTimeout(renderDailyChallenge, 1800); // Update UI after short delay
-    } else {
-      resultDiv.innerHTML = `❌ Incorrect. Try again!`;
-    }
-  };
-}
   </script>
 </body>
 </html>
