@@ -1291,25 +1291,47 @@ function saveDailyChallenge() {
 
 // Generate a single challenge question (reuses your logic)
 function generateChallengeQuestion() {
-  let poke = pickEligiblePokemon();
-  if (!poke) return null;
-  let fastList = getPreferredOrAllFastMoves(poke);
-  let chargeList = getPreferredOrAllChargeMoves(poke);
+  // Use onlyHighScore = true just for daily challenge generation
+  let eligible = pokedex.filter(poke => {
+    let name = poke.speciesName;
+    let fastList, chargeList;
+    if (metaPreferred[name]) {
+      fastList = [metaPreferred[name].fast].filter(mv => !!movesByName[mv]);
+      chargeList = [metaPreferred[name].charge1, metaPreferred[name].charge2].filter(mv => !!movesByName[mv]);
+    } else {
+      fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
+      chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
+    }
+    // ONLY include if score > 80 and in metaPokes
+    return fastList.length && chargeList.length && metaPokes.includes(name);
+  });
+  if (!eligible.length) return null;
+  let pokemon = eligible[Math.floor(Math.random() * eligible.length)];
+  let name = pokemon.speciesName;
+  let fastList = metaPreferred[name]
+    ? [metaPreferred[name].fast].filter(mv => !!movesByName[mv])
+    : (pokemon.fastMoves || []).filter(mv => !!movesByName[mv]);
+  let chargeList = metaPreferred[name]
+    ? [metaPreferred[name].charge1, metaPreferred[name].charge2].filter(mv => !!movesByName[mv])
+    : (pokemon.chargedMoves || []).filter(mv => !!movesByName[mv]);
   let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
   let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
-  let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, 1);
+  let which = 1 + Math.floor(Math.random() * 4); // multi-charge: random 1st, 2nd, 3rd, or 4th
+  let nthText = getOrdinalText(which);
+  let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
   return {
-    question: `How many "${fast.Move}" (Fast) are needed for the 1st "${charge.Move}" (Charged) for ${poke.speciesName}?`,
+    question: `How many "${fast.Move}" (Fast) are needed for the ${nthText} "${charge.Move}" (Charged) for ${pokemon.speciesName}?`,
     answer: needed,
     fastMove: fast.Move,
     chargeMove: charge.Move,
-    pokemon: poke.speciesName,
+    pokemon: pokemon.speciesName,
     fast,
     charge,
-    poke
+    poke: pokemon,
+    which,
+    nthText
   };
 }
-
 // Pick a reward fruit (Uncommon+)
 function pickDailyFruit() {
   let pool = LEVELUP_REWARDS.filter(f => ["Uncommon", "Rare", "Epic", "Legendary"].includes(f.rarityKey));
