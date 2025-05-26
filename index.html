@@ -328,10 +328,7 @@
         <button id="closeTradeupMenu" style="position:absolute; right:0.7em; top:0.7em; font-size:1.4em; background:none; border:none; color:#666; cursor:pointer;">×</button>
         <div id="tradeupSection" style="text-align:center;">
           <b>Trade Up Fruits</b><br>
-          <button id="tradeCommon" style="margin:0.2em;">5×🟢 Common → 1×🔵 Uncommon</button>
-          <button id="tradeUncommon" style="margin:0.2em;">5×🔵 Uncommon → 1×🟣 Rare</button>
-          <button id="tradeRare" style="margin:0.2em;">5×🟣 Rare → 1×🟠 Epic</button>
-          <button id="tradeEpic" style="margin:0.2em;">5×🟠 Epic → 1×🔴 Legendary</button>
+          <div id="tradeupTiers"></div>
           <div id="tradeupMsg" style="color:#1864ab;font-size:0.97em;margin-top:0.5em;"></div>
         </div>
       </div>
@@ -1136,6 +1133,7 @@
       document.getElementById('tradeupMsg').innerHTML = tryTradeUp("Epic", "Legendary", 5);
     };
     document.getElementById('openTradeupMenu').onclick = function() {
+      renderTradeupTiers(); // <-- this will render the fruit picker UI
       document.getElementById('tradeupModal').style.display = "flex";
     };
     document.getElementById('closeTradeupMenu').onclick = function() {
@@ -1182,6 +1180,92 @@
     document.getElementById('fruitEncyclopediaModal').onclick = function(e) {
       if (e.target === this) this.style.display = "none";
     };
+    function renderTradeupTiers() {
+      const rarityOrder = ["Common","Uncommon","Rare","Epic"];
+      const nextRarity = {
+        Common: "Uncommon",
+        Uncommon: "Rare",
+        Rare: "Epic",
+        Epic: "Legendary"
+      };
+      const cost = 5;
+      let html = "";
+      for (let from of rarityOrder) {
+        let fromFruits = LEVELUP_REWARDS.filter(f => f.rarityKey === from);
+        let to = nextRarity[from];
+        if (!to) continue;
+        let haveAny = fromFruits.some(fruit => (xpState.fruitBag[fruit.emoji]||0)>0);
+        html += `<div style="margin:1em 0;">
+          <b>${cost}×${fromFruits.map(f=>f.emoji).join("")} (${from}) → 1×${LEVELUP_REWARDS.find(f=>f.rarityKey===to).emoji} (${to})</b><br>`;
+        if (haveAny) {
+          html += `<form class="tradeupForm" data-from="${from}" data-to="${to}">`;
+          fromFruits.forEach(fruit => {
+            let count = xpState.fruitBag[fruit.emoji]||0;
+            html += `<span style="display:inline-block;margin:0.3em;">
+              <span style="font-size:1.5em">${fruit.emoji}</span>
+              <input type="number" min="0" max="${count}" value="0" style="width:3em;" name="${fruit.emoji}">
+              <span style="font-size:0.9em;">/ ${count}</span>
+            </span>`;
+          });
+          html += `<button type="submit">Trade Up</button></form>`;
+        } else {
+          html += `<span style="color:#888;">You have no ${from} fruits to trade up.</span>`;
+        }
+        html += `</div>`;
+      }
+      document.getElementById('tradeupTiers').innerHTML = html;
+
+  // Add event listeners for all tradeup forms
+      document.querySelectorAll('.tradeupForm').forEach(form => {
+        form.onsubmit = function(e) {
+          e.preventDefault();
+          const from = form.getAttribute('data-from');
+          const to = form.getAttribute('data-to');
+          let total = 0;
+          let useFruits = {};
+          Array.from(form.elements).forEach(el => {
+            if (el.tagName === "INPUT" && el.type === "number" && el.name) {
+              let val = parseInt(el.value,10) || 0;
+              if (val > 0) {
+                useFruits[el.name] = val;
+                total += val;
+              }
+            }
+          });
+          if (total !== cost) {
+            document.getElementById('tradeupMsg').textContent = `You must select exactly ${cost} fruits to trade up.`;
+            return;
+          }
+          document.getElementById('tradeupMsg').innerHTML = tryTradeUpSelected(from, to, cost, useFruits);
+          renderTradeupTiers(); // re-render to update available counts
+        };
+      });
+    }
+    function tryTradeUpSelected(fromKey, toKey, cost, useFruits) {
+  // Check counts
+      let total = 0;
+      for (let emoji in useFruits) {
+        let count = xpState.fruitBag[emoji]||0;
+        let use = useFruits[emoji];
+        if (use > count) return `Not enough ${emoji} fruits!`;
+        total += use;
+      }
+      if (total !== cost) return `You must select exactly ${cost} fruits.`;
+  // Remove selected fruits
+      for (let emoji in useFruits) {
+        xpState.fruitBag[emoji] -= useFruits[emoji];
+        if (xpState.fruitBag[emoji] <= 0) delete xpState.fruitBag[emoji];
+      }
+  // Add one higher rarity fruit
+      let newFruit = getRandomFruitByRarity(toKey);
+      if (!xpState.fruitBag[newFruit.emoji]) xpState.fruitBag[newFruit.emoji] = 0;
+      xpState.fruitBag[newFruit.emoji]++;
+      saveXP();
+      showXP();
+  // If encyclopedia modal open, update it
+      if (document.getElementById('fruitEncyclopediaModal')?.style.display === "flex") renderFruitEncyclopedia();
+      return `Traded up to <span style="font-size:1.2em">${newFruit.emoji}</span> <b>${newFruit.name}</b>!`;
+    }
   </script>
 </body>
 </html>
