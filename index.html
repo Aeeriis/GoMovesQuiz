@@ -5,8 +5,6 @@
   <title>Pokémon Go Moveset Energy Quiz</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" href="icons/icon-192.png">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <style>
     body { font-family: Arial, sans-serif; margin: 0; background: #fafaff; }
     .container { max-width: 480px; margin: auto; padding: 1em; }
@@ -320,7 +318,6 @@
     </div>
     <div id="levelstats"></div>
     <div id="xpstats"></div>
-    <div id="fruitTradeUp" style="margin-top:1em;"></div>
     <div id="levelupReward"></div>
     <div id="stats"></div>
     <div id="avgstats"></div>
@@ -352,7 +349,7 @@
 
     // --- XP / LEVELS / REWARDS ---
     const LEVELUP_REWARDS = [
-      { emoji: "🍎", name: "",        rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
+      { emoji: "🍎", name: "Apple",        rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
       { emoji: "🍌", name: "Banana",       rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
       { emoji: "🍊", name: "Orange",       rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
       { emoji: "🍇", name: "Grapes",       rarity: "🟢 Common", prob: 10, rarityKey: "Common" },
@@ -376,18 +373,18 @@
       { emoji: "🍫", name: "Cupuaçu",      rarity: "🔴 Legendary", prob: 0.66, rarityKey: "Legendary" }
     ];
     function calcXP(difficulty, onlyHighScore) {
-      let base = 12;
-      if (difficulty === "multi") base = 17;
-      else if (difficulty === "combo") base = 23;
-      if (onlyHighScore) base = Math.round(base * 0.85);
+      let base = 7;
+      if (difficulty === "multi") base = 12;
+      else if (difficulty === "combo") base = 18;
+      if (onlyHighScore) base = Math.round(base * 0.67);
       return base;
     }
     function getLevelInfo(xp) {
-      let level = 1, total = 0, next = 45;
+      let level = 1, total = 0, next = 50;
       while (xp >= total + next) {
         total += next;
         level++;
-        next = level * 45;
+        next = level * 50;
       }
       return { level, xpInLevel: xp - total, xpToNext: next - (xp - total), xpForNext: next };
     }
@@ -414,64 +411,6 @@
         Epic: "🟠 Epic",
         Legendary: "🔴 Legendary"
       };
-      // --- Fruit Trade Up Feature ---
-function showTradeUpOptions() {
-  let rarityOrder = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
-  let rarityTitles = {
-    Common: "🟢 Common",
-    Uncommon: "🔵 Uncommon",
-    Rare: "🟣 Rare",
-    Epic: "🟠 Epic",
-    Legendary: "🔴 Legendary"
-  };
-  let html = "<b>Trade Up Fruits:</b><br>";
-  let canTrade = false;
-  for (let i = 0; i < rarityOrder.length - 1; i++) {
-    let rarity = rarityOrder[i];
-    let nextRarity = rarityOrder[i + 1];
-    // Get all fruits of this rarity
-    let fruits = LEVELUP_REWARDS.filter(f => f.rarityKey === rarity);
-    let total = fruits.reduce((sum, f) => sum + (xpState.fruitBag[f.emoji] || 0), 0);
-
-    if (fruits.length && total >= 5) {
-      canTrade = true;
-      html += `<button onclick="tradeUpFruit('${rarity}')">
-        Trade 5 ${rarityTitles[rarity]} for 1 ${rarityTitles[nextRarity]}
-      </button> (You have ${total})<br>`;
-    }
-  }
-  if (!canTrade) html += "<span style='color:#888'>Collect at least 5 of a kind to trade up!</span>";
-  document.getElementById('fruitTradeUp').innerHTML = html;
-}
-
-function tradeUpFruit(rarity) {
-  let rarityOrder = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
-  // Find all fruits of this rarity, sorted by count descending
-  let fruits = LEVELUP_REWARDS.filter(f => f.rarityKey === rarity)
-    .sort((a, b) => (xpState.fruitBag[b.emoji]||0) - (xpState.fruitBag[a.emoji]||0));
-  let toTrade = 5;
-  for (let fruit of fruits) {
-    let have = xpState.fruitBag[fruit.emoji] || 0;
-    if (have > 0) {
-      let take = Math.min(have, toTrade);
-      xpState.fruitBag[fruit.emoji] -= take;
-      toTrade -= take;
-      if (toTrade === 0) break;
-    }
-  }
-  // Add 1 of next rarity (randomly selected)
-  let idx = rarityOrder.indexOf(rarity);
-  if (idx >= 0 && idx < rarityOrder.length - 1) {
-    let nextRarity = rarityOrder[idx + 1];
-    let nextFruits = LEVELUP_REWARDS.filter(f => f.rarityKey === nextRarity);
-    let fruit = nextFruits[Math.floor(Math.random() * nextFruits.length)];
-    xpState.fruitBag[fruit.emoji] = (xpState.fruitBag[fruit.emoji] || 0) + 1;
-    saveXP();
-    showXP();
-    showTradeUpOptions();
-    showLevelupReward(fruit);
-  }
-}
       let bagByRarity = {};
       for (let fruit of LEVELUP_REWARDS) {
         let count = xpState.fruitBag[fruit.emoji] || 0;
