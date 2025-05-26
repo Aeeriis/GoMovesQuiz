@@ -430,6 +430,12 @@
     let xpState = JSON.parse(localStorage.getItem('quizXP') || '{"xp":0,"fruitBag":{}}');
     if (!xpState.fruitBag) xpState.fruitBag = {};
     if (!xpState.discoveredFruits) xpState.discoveredFruits = {}; // <-- add this line
+    for (let emoji in xpState.fruitBag) {
+      if ((xpState.fruitBag[emoji] || 0) > 0) {
+        xpState.discoveredFruits[emoji] = true;
+      }
+    }
+    saveXP();
     function saveXP() { localStorage.setItem('quizXP', JSON.stringify(xpState)); }
     function showXP() {
       const info = getLevelInfo(xpState.xp);
