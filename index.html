@@ -1489,8 +1489,16 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
       state.progress++;
       if (state.progress === 10) {
         state.completed = true;
+        state.fruitClaimed = true; // Make fruit appear immediately
+  // Award fruit
+        if (!xpState.fruitBag[state.fruit.emoji]) xpState.fruitBag[state.fruit.emoji] = 0;
+        xpState.fruitBag[state.fruit.emoji]++;
+        xpState.discoveredFruits[state.fruit.emoji] = true;
+        saveXP();
+        showXP();
+        renderFruitEncyclopedia && renderFruitEncyclopedia();
         saveDailyChallenge();
-        setTimeout(renderDailyChallenge, 800);
+        renderDailyChallenge(); // Immediately show completion UI with share
         return;
       }
       saveDailyChallenge();
