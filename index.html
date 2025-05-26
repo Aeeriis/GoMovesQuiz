@@ -383,11 +383,11 @@
       return base;
     }
     function getLevelInfo(xp) {
-      let level = 1, total = 0, next = 50;
+      let level = 1, total = 0, next = 45;
       while (xp >= total + next) {
         total += next;
         level++;
-        next = level * 50;
+        next = level * 45;
       }
       return { level, xpInLevel: xp - total, xpToNext: next - (xp - total), xpForNext: next };
     }
