@@ -1316,6 +1316,23 @@ function pickDailyFruit() {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+function getDailyChallengeFruit() {
+  // Your custom rarity drop rates
+  const rarityTable = [
+    { rarity: "Uncommon", prob: 45 },
+    { rarity: "Rare",     prob: 35 },
+    { rarity: "Epic",     prob: 15 },
+    { rarity: "Legendary",prob: 5  }
+  ];
+  let r = Math.random() * 100, acc = 0, chosenRarity = "Uncommon";
+  for (let row of rarityTable) {
+    acc += row.prob;
+    if (r < acc) { chosenRarity = row.rarity; break; }
+  }
+  // Get fruits of that rarity
+  const pool = LEVELUP_REWARDS.filter(f => f.rarityKey === chosenRarity);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 // Generate a challenge state for today (10 questions, new reward)
 function generateNewChallengeForToday() {
   let today = getTodayStr();
@@ -1326,7 +1343,7 @@ function generateNewChallengeForToday() {
     if (!q) break;
     questions.push(q);
   }
-  let fruit = pickDailyFruit();
+  let fruit = getDailyChallengeFruit();
   dailyChallengeState = {
     date: today,
     questions,
