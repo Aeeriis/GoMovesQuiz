@@ -429,6 +429,7 @@
     }
     let xpState = JSON.parse(localStorage.getItem('quizXP') || '{"xp":0,"fruitBag":{}}');
     if (!xpState.fruitBag) xpState.fruitBag = {};
+    if (!xpState.discoveredFruits) xpState.discoveredFruits = {}; // <-- add this line
     function saveXP() { localStorage.setItem('quizXP', JSON.stringify(xpState)); }
     function showXP() {
       const info = getLevelInfo(xpState.xp);
@@ -655,7 +656,7 @@
       stats = { total: 0, correct: 0, sumTime: 0, sumTimeRight: 0, rightCount: 0 };
       saveStats();
       showStats();
-      xpState = { xp: 0, fruitBag: {} };
+      xpState = { xp: 0, fruitBag: {}, discoveredFruits: {} };
       saveXP();
       showXP();
     };
@@ -1064,6 +1065,7 @@
           let fruit = getRandomFruitReward();
           if (!xpState.fruitBag[fruit.emoji]) xpState.fruitBag[fruit.emoji] = 0;
           xpState.fruitBag[fruit.emoji]++;
+          xpState.discoveredFruits[fruit.emoji] = true; // <-- add this line
           saveXP();
           showXP();
           showLevelupReward(fruit);
@@ -1116,6 +1118,7 @@
       let newFruit = getRandomFruitByRarity(toKey);
       if (!xpState.fruitBag[newFruit.emoji]) xpState.fruitBag[newFruit.emoji] = 0;
       xpState.fruitBag[newFruit.emoji]++;
+      xpState.discoveredFruits[newFruit.emoji] = true; // <-- add this line
       saveXP();
       showXP();
       return `Traded up to <span style="font-size:1.2em">${newFruit.emoji}</span> <b>${newFruit.name}</b>!`;
@@ -1147,7 +1150,7 @@
         if (!group.length) continue;
         html += `<div style="margin:0.8em 0 0.2em 0; font-weight:bold;">${rarityTitles[rarity]}:</div>`;
         html += group.map(fruit => {
-          let discovered = (xpState.fruitBag[fruit.emoji] || 0) > 0;
+          let discovered = !!xpState.discoveredFruits[fruit.emoji];
           return `<span style="display:inline-block; min-width:3em; margin:0.18em 0.18em 0.45em 0.18em; text-align:center;">
             <span style="font-size:2em;">${discovered ? fruit.emoji : "❓"}</span><br>
             <span style="font-size:0.96em; color:#333;">${discovered ? fruit.name : "???"}</span>
