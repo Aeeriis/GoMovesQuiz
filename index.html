@@ -252,6 +252,14 @@
     <h1>Pokémon Go Moveset Energy Quiz</h1>
     <button id="openTradeupMenu" style="margin:0.5em 0;">Fruit Trade Up</button>
     <button id="openFruitEncyclopedia" style="margin:0.5em 0;">Fruit Encyclopedia</button>
+    <button onclick="fetchLeaderboard(); document.getElementById('leaderboardModal').style.display='block'">Show Leaderboard</button>
+    <div id="leaderboardModal" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:9999; align-items:center; justify-content:center;">
+      <div style="background:#fff; border-radius:10px; max-width:350px; margin:auto; padding:1.2em; box-shadow:0 8px 32px #0004; position:relative;">
+        <h2>Leaderboard</h2>
+        <ol id="leaderboardList"></ol>
+        <button onclick="document.getElementById('leaderboardModal').style.display='none'">Close</button>
+      </div>
+    </div>
     <div id="intro-explanation">
       <b>How the quiz works:</b>
       <ul>
@@ -367,6 +375,52 @@
       <button id="fixedNextBtn" type="button">Next Question</button>
     </span>
   </div>
+  <!-- Add these scripts just before your closing </body> tag, or BEFORE any code that uses Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
+<script>
+  // Your web app's Firebase configuration (from your screenshot)
+  const firebaseConfig = {
+    apiKey: "AIzaSyAA0yCw8v0WUtDp13Qs_55tmIZXJUFcI3o",
+    authDomain: "gomovesquiz-d0e8e.firebaseapp.com",
+    databaseURL: "https://gomovesquiz-d0e8e-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "gomovesquiz-d0e8e",
+    storageBucket: "gomovesquiz-d0e8e.appspot.com",
+    messagingSenderId: "105342911635",
+    appId: "1:105342911635:web:4298b9d345fc1255b97966",
+    measurementId: "G-TSZNRZQ83H"
+  };
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // --- Leaderboard functions ---
+
+  // Call this to submit a score
+  function submitScore(username, score) {
+    db.ref('leaderboard').push({
+      username: username,
+      score: score,
+      timestamp: Date.now()
+    });
+  }
+
+  // Call this to fetch and render the leaderboard (top 10 scores)
+  function fetchLeaderboard() {
+    db.ref('leaderboard')
+      .orderByChild('score')
+      .limitToLast(10)
+      .once('value')
+      .then(snapshot => {
+        let entries = [];
+        snapshot.forEach(child => entries.push(child.val()));
+        entries.sort((a, b) => b.score - a.score);
+        document.getElementById('leaderboardList').innerHTML = entries.map(
+          (entry, idx) => `<li>#${idx+1} ${entry.username}: ${entry.score}</li>`
+        ).join('');
+      });
+  }
+</script>
   <script>
     // --- ANTI-FARMING STATE ---
     // This flag determines if XP has already been awarded for the current question
