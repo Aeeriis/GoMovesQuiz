@@ -404,18 +404,18 @@
       { from: "Epic", to: "Legendary", cost: 3 }
     ];
     function calcXP(difficulty, onlyHighScore) {
-      let base = 7;
-      if (difficulty === "multi") base = 12;
-      else if (difficulty === "combo") base = 18;
-      if (onlyHighScore) base = Math.round(base * 0.67);
+      let base = 12;
+      if (difficulty === "multi") base = 18;
+      else if (difficulty === "combo") base = 23;
+      if (onlyHighScore) base = Math.round(base * 0.85);
       return base;
     }
     function getLevelInfo(xp) {
-      let level = 1, total = 0, next = 1;
+      let level = 1, total = 0, next = 45;
       while (xp >= total + next) {
         total += next;
         level++;
-        next = level * 1;
+        next = level * 45;
       }
       return { level, xpInLevel: xp - total, xpToNext: next - (xp - total), xpForNext: next };
     }
