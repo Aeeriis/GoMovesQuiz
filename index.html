@@ -1394,11 +1394,44 @@ function renderDailyChallenge() {
 
   // If fruit was already claimed for today, lock challenge
   if (state.fruitClaimed) {
-    body.innerHTML =
-      `🎉 <b>Complete!</b><br><br>You earned: <span style="font-size:2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b><br>
-      Come back tomorrow for a new challenge!`;
-    return;
-  }
+  const shareMsg = `I completed today's Pokémon Go Moveset Energy Quiz Daily Challenge and got a ${state.fruit.emoji} ${state.fruit.name}! 🍀
+Try it yourself: https://YOUR-APP-URL-HERE
+`;
+  body.innerHTML =
+    `🎉 <b>Complete!</b><br><br>
+    You earned: <span style="font-size:2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b><br>
+    <button id="dailyChallengeShareBtn" style="margin-top:1em;">Share</button>
+    <div id="dailyChallengeShareMsg" style="color:#228be6;font-size:1em;margin-top:0.5em;"></div>
+    <br>Come back tomorrow for a new challenge!`;
+
+  // Add the share/copy logic
+  setTimeout(() => {
+    const btn = document.getElementById('dailyChallengeShareBtn');
+    const msgDiv = document.getElementById('dailyChallengeShareMsg');
+    if (btn) {
+      btn.onclick = async function () {
+        if (navigator.share) {
+          try {
+            await navigator.share({ text: shareMsg });
+            msgDiv.textContent = "Shared!";
+          } catch (e) {
+            msgDiv.textContent = "Share cancelled.";
+          }
+        } else {
+          // Fallback: copy to clipboard
+          try {
+            await navigator.clipboard.writeText(shareMsg);
+            msgDiv.textContent = "Copied to clipboard!";
+          } catch {
+            msgDiv.textContent = "Failed to copy!";
+          }
+        }
+        setTimeout(() => { msgDiv.textContent = ""; }, 2000);
+      }
+    }
+  }, 0);
+  return;
+}
   // If challenge failed
   if (state.failed) {
     body.innerHTML =
