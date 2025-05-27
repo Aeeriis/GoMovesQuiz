@@ -1451,21 +1451,17 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
   }
 
   // If challenge complete but fruit not yet claimed
-  if (state.completed && !state.fruitClaimed) {
-    // Award fruit if not already given for today
-    state.fruitClaimed = true;
-    if (!xpState.fruitBag[state.fruit.emoji]) xpState.fruitBag[state.fruit.emoji] = 0;
-    xpState.fruitBag[state.fruit.emoji]++;
-    xpState.discoveredFruits[state.fruit.emoji] = true;
-    saveXP();
-    showXP();
-    renderFruitEncyclopedia && renderFruitEncyclopedia();
-    saveDailyChallenge();
-    body.innerHTML =
-      `🎉 <b>Complete!</b><br><br>You earned: <span style="font-size:2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b><br>
-      Come back tomorrow for a new challenge!`;
-    return;
-  }
+  if (state.completed && state.fruitClaimed) {
+  // Only display the reward, don't modify state!
+  body.innerHTML =
+    `🎉 <b>Complete!</b><br><br>
+    You earned: <span style="font-size:2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b><br>
+    <button id="dailyChallengeShareBtn" style="margin-top:1em;">Share</button>
+    <div id="dailyChallengeShareMsg" style="color:#228be6;font-size:1em;margin-top:0.5em;"></div>
+    <br>Come back tomorrow for a new challenge!`;
+  // ... (share button code) ...
+  return;
+}
 
   // Normal progress
   let qNum = state.progress + 1;
