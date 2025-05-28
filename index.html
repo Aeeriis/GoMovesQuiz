@@ -254,6 +254,7 @@
     <button id="openFruitEncyclopedia" style="margin:0.5em 0;">Fruit Encyclopedia</button>
     <!-- Add this in your HTML, e.g. below the Fruit Encyclopedia button: -->
     <button id="openDailyChallenge" style="margin:0.5em 0;">Daily Challenge 🍀</button>
+    <button id="openFeedback" style="margin:0.5em 0;">Feedback</button>
 
     <!-- Daily Challenge Modal -->
     <div id="dailyChallengeModal" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; 
@@ -264,6 +265,19 @@
         <div id="dailyChallengeBody" style="margin-top:0.3em; font-size:1.13em; text-align:center;">
       <!-- Filled by JS -->
         </div>
+      </div>
+    </div>
+    <!-- Feedback Modal -->
+    <div id="feedbackModal" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh;
+      background:rgba(0,0,0,0.4); z-index:9999; align-items:center; justify-content:center;">
+      <div style="background:#fff; border-radius:10px; max-width:430px; margin:auto; padding:1.2em; box-shadow:0 8px 32px #0004; position:relative;">
+        <button id="closeFeedbackModal" style="position:absolute; right:0.7em; top:0.7em; font-size:1.4em; background:none; border:none; color:#666; cursor:pointer;">×</button>
+        <div style="font-size:1.3em; font-weight:bold; text-align:center; margin-bottom:0.6em;">Feedback</div>
+        <form id="feedbackForm" style="display:flex; flex-direction:column; gap:0.7em;">
+          <textarea id="feedbackText" rows="5" style="width:100%;font-size:1.1em;" placeholder="Your feedback..."></textarea>
+          <button type="submit" style="font-size:1.1em;">Send Feedback</button>
+        </form>
+        <div id="feedbackThanks" style="display:none; color:green; text-align:center; margin-top:0.7em;">Thank you for your feedback!</div>
       </div>
     </div>
     <div id="intro-explanation">
@@ -1545,6 +1559,34 @@ document.getElementById('dailyChallengeModal').onclick = function(e) {
     justCompletedDailyChallenge = false;
     this.style.display = "none";
   }
+};
+// feedback
+const openFeedback = document.getElementById('openFeedback');
+const feedbackModal = document.getElementById('feedbackModal');
+const closeFeedbackModal = document.getElementById('closeFeedbackModal');
+const feedbackForm = document.getElementById('feedbackForm');
+const feedbackText = document.getElementById('feedbackText');
+const feedbackThanks = document.getElementById('feedbackThanks');
+
+openFeedback.onclick = () => {
+  feedbackModal.style.display = 'flex';
+  feedbackThanks.style.display = 'none';
+  feedbackForm.style.display = 'flex';
+  feedbackText.value = '';
+};
+closeFeedbackModal.onclick = () => {
+  feedbackModal.style.display = 'none';
+};
+feedbackForm.onsubmit = (e) => {
+  e.preventDefault();
+  // Send feedback via email (mailto)
+  const body = encodeURIComponent(feedbackText.value);
+  window.open(`mailto:YOUR_EMAIL@example.com?subject=GoMovesQuiz%20Feedback&body=${body}`, '_blank');
+  feedbackForm.style.display = 'none';
+  feedbackThanks.style.display = 'block';
+  setTimeout(() => {
+    feedbackModal.style.display = 'none';
+  }, 2000);
 };
   </script>
 </body>
