@@ -1279,14 +1279,17 @@
     }
 // --- Daily Challenge: 10 Questions, Retry on Failure ---
 // --- 24h Rolling Timer Helpers ---
+// --- 24h Rolling Timer Helpers ---
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 // Helper: get lock state for the daily challenge (returns {locked, msLeft})
 function getDailyChallengeLockState() {
+  // Only lock if fruit was claimed
   let now = Date.now();
   let last = dailyChallengeState.lastTimestamp || 0;
   let msLeft = (last + ONE_DAY_MS) - now;
-  return { locked: msLeft > 0, msLeft };
+  let locked = dailyChallengeState.fruitClaimed && msLeft > 0;
+  return { locked, msLeft };
 }
 
 // Helper: format ms into "Xh Ym Zs"
@@ -1367,7 +1370,7 @@ function getDailyChallengeFruit() {
 }
 
 // --- Generate a challenge state for this attempt (10 questions, new reward) ---
-function generateNewChallengeFor24h() {
+function generateNewChallenge() {
   let questions = [];
   for (let i = 0; i < 10; ++i) {
     let q = generateChallengeQuestion();
@@ -1376,37 +1379,32 @@ function generateNewChallengeFor24h() {
   }
   let fruit = getDailyChallengeFruit();
   dailyChallengeState = {
-    lastTimestamp: Date.now(),
     questions,
     progress: 0,
     failed: false,
     completed: false,
     fruit,
-    fruitClaimed: false
+    fruitClaimed: false,
+    lastTimestamp: dailyChallengeState.lastTimestamp || 0 // keep lastTimestamp if present
   };
   saveDailyChallenge();
   return dailyChallengeState;
 }
 
-// --- Retrieve or create challenge (if expired or missing) ---
-function getOrCreate24hChallenge() {
+// --- Retrieve or create challenge (only if not locked and not claimed) ---
+function getOrCreateChallenge() {
   let lock = getDailyChallengeLockState();
-  if (
-    !dailyChallengeState.lastTimestamp ||
-    lock.msLeft <= 0 ||
-    !dailyChallengeState.questions ||
-    dailyChallengeState.questions.length !== 10
-  ) {
-    return generateNewChallengeFor24h();
-  }
-  return dailyChallengeState;
+  // If locked, do not create a new challenge:
+  if (lock.locked) return dailyChallengeState;
+  // If not locked, always create a fresh one (so they can retry after failure)
+  return generateNewChallenge();
 }
 
 // --- UI: Render daily challenge, with 24h cooldown logic ---
 function renderDailyChallenge() {
-  let state = dailyChallengeState;
   let body = document.getElementById('dailyChallengeBody');
   let lock = getDailyChallengeLockState();
+  let state = getOrCreateChallenge();
 
   // --- If challenge is locked, show countdown ---
   if (lock.locked) {
@@ -1418,7 +1416,7 @@ function renderDailyChallenge() {
       let lock2 = getDailyChallengeLockState();
       document.getElementById('dailyChallengeCountdown').textContent = formatCountdown(lock2.msLeft);
       if (!lock2.locked) {
-        renderDailyChallenge(); // auto-refresh when unlocked
+        renderDailyChallenge();
       } else {
         setTimeout(updateTimer, 1000);
       }
@@ -1427,8 +1425,6 @@ function renderDailyChallenge() {
     document.getElementById('dailyChallengeForceCheckBtn').onclick = renderDailyChallenge;
     return;
   }
-  // --- When unlocked, get/create challenge for this 24h window ---
-  state = getOrCreate24hChallenge();
 
   // --- If fruit was claimed, show win screen and share ---
   if (state.fruitClaimed) {
@@ -1477,7 +1473,7 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
       You missed a question.<br>
       <button id="dailyChallengeRetryBtn" style="margin-top:1em;">Try Again (New Questions)</button>`;
     document.getElementById('dailyChallengeRetryBtn').onclick = function() {
-      generateNewChallengeFor24h();
+      generateNewChallenge();
       renderDailyChallenge();
     };
     return;
@@ -1511,14 +1507,15 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
       state.progress++;
       if (state.progress === 10) {
         state.completed = true;
-        state.fruitClaimed = true; // Make fruit appear immediately
+        state.fruitClaimed = true;
+        state.lastTimestamp = Date.now(); // LOCK ONLY ON PASS!
         // Award fruit
         if (!xpState.fruitBag[state.fruit.emoji]) xpState.fruitBag[state.fruit.emoji] = 0;
         xpState.fruitBag[state.fruit.emoji]++;
         xpState.discoveredFruits[state.fruit.emoji] = true;
-        saveXP();
-        showXP();
-        renderFruitEncyclopedia && renderFruitEncyclopedia();
+        saveXP && saveXP();
+        showXP && showXP();
+        typeof renderFruitEncyclopedia === "function" && renderFruitEncyclopedia();
         saveDailyChallenge();
         renderDailyChallenge(); // Immediately show completion UI with share
         return;
