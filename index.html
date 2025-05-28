@@ -1278,25 +1278,36 @@
       return `Traded up to <span style="font-size:1.2em">${newFruit.emoji}</span> <b>${newFruit.name}</b>!`;
     }
 // --- Daily Challenge: 10 Questions, Retry on Failure ---
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+// --- Reset at midnight UTC+0 ---
 
-// --- SESSION FLAG ---
-let justCompletedDailyChallenge = false;
-
-// --- State load/save ---
+// --- Daily Challenge State ---
 let dailyChallengeState = JSON.parse(localStorage.getItem('dailyChallenge') || '{}');
 function saveDailyChallenge() {
   localStorage.setItem('dailyChallenge', JSON.stringify(dailyChallengeState));
 }
 
-// --- Helpers ---
+// --- Helper: get today's date string in UTC (YYYY-MM-DD) ---
+function getTodayUTCDateString() {
+  let d = new Date();
+  return d.toISOString().slice(0, 10);
+}
+
+// --- Helper: seconds until next UTC midnight ---
+function msUntilNextUTCMidnight() {
+  let now = new Date();
+  let nextMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
+  return nextMidnight - now;
+}
+
+// --- Get lock state for daily challenge (locked if already claimed today) ---
 function getDailyChallengeLockState() {
-  let now = Date.now();
-  let last = dailyChallengeState.lastTimestamp || 0;
-  let msLeft = (last + ONE_DAY_MS) - now;
-  let locked = dailyChallengeState.fruitClaimed && msLeft > 0;
+  let today = getTodayUTCDateString();
+  let locked = (dailyChallengeState.lastCompletedDate === today);
+  let msLeft = locked ? msUntilNextUTCMidnight() : 0;
   return { locked, msLeft };
 }
+
+// --- Format ms as "Xh Ym Zs" ---
 function formatCountdown(ms) {
   let s = Math.floor(ms / 1000);
   let h = Math.floor(s / 3600);
@@ -1305,7 +1316,7 @@ function formatCountdown(ms) {
   return `${h}h ${m}m ${sec}s`;
 }
 
-// --- Challenge generation (your logic, unchanged) ---
+// --- Generate a challenge question (your logic, unchanged) ---
 function generateChallengeQuestion() {
   let eligible = pokedex.filter(poke => {
     let name = poke.speciesName;
@@ -1346,6 +1357,8 @@ function generateChallengeQuestion() {
     nthText
   };
 }
+
+// --- Pick a reward fruit (Uncommon+) ---
 function getDailyChallengeFruit() {
   const rarityTable = [
     { rarity: "Uncommon", prob: 45 },
@@ -1376,11 +1389,14 @@ function generateNewChallenge() {
     completed: false,
     fruit,
     fruitClaimed: false,
-    lastTimestamp: dailyChallengeState.lastTimestamp || 0
+    lastCompletedDate: dailyChallengeState.lastCompletedDate || null
   };
   saveDailyChallenge();
   return dailyChallengeState;
 }
+
+// --- SESSION FLAG for "just completed" ---
+let justCompletedDailyChallenge = false;
 
 // --- Main render ---
 function renderDailyChallenge() {
@@ -1388,7 +1404,7 @@ function renderDailyChallenge() {
   let lock = getDailyChallengeLockState();
   let state = dailyChallengeState;
 
-  // --- Show congrats/share if just completed (even if locked) ---
+  // Show congrats/share if just completed (even if locked)
   if (state.fruitClaimed && (justCompletedDailyChallenge || !lock.locked)) {
     const shareMsg = `I completed today's Pokémon Go Moveset Energy Quiz Daily Challenge and got a ${state.fruit.emoji} ${state.fruit.name}! 🍀
 Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
@@ -1398,7 +1414,7 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
       You earned: <span style="font-size:2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b><br>
       <button id="dailyChallengeShareBtn" style="margin-top:1em;">Share</button>
       <div id="dailyChallengeShareMsg" style="color:#228be6;font-size:1em;margin-top:0.5em;"></div>
-      <br>Come back in 24 hours for a new challenge!`;
+      <br>Come back after midnight UTC for a new challenge!`;
 
     const btn = document.getElementById('dailyChallengeShareBtn');
     const msgDiv = document.getElementById('dailyChallengeShareMsg');
@@ -1425,10 +1441,10 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
     return;
   }
 
-  // --- If locked, show countdown ---
+  // --- If locked, show countdown until midnight UTC ---
   if (lock.locked) {
     body.innerHTML =
-      `⏳ <b>Come back in:</b><br><br>
+      `⏳ <b>Come back after midnight UTC:</b><br><br>
       <span id="dailyChallengeCountdown" style="font-size:1.6em;"></span><br>
       <button id="dailyChallengeForceCheckBtn" style="margin-top:1em;">Check Again</button>`;
     function updateTimer() {
@@ -1487,7 +1503,7 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
       if (state.progress === 10) {
         state.completed = true;
         state.fruitClaimed = true;
-        state.lastTimestamp = Date.now();
+        state.lastCompletedDate = getTodayUTCDateString();
         justCompletedDailyChallenge = true;
         if (!xpState.fruitBag[state.fruit.emoji]) xpState.fruitBag[state.fruit.emoji] = 0;
         xpState.fruitBag[state.fruit.emoji]++;
