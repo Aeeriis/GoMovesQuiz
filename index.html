@@ -242,7 +242,7 @@
       .disclaimer { font-size: 0.95em; padding: 0.56em 0.7em; }
       .copyright { font-size: 0.78em; }
     }
-    .main-action {
+    button.main-action, .main-action {
       font-size: 1.1em;
       padding: 0.6em 1.2em;
       margin: 0.5em 0;
@@ -254,8 +254,11 @@
       cursor: pointer;
       transition: background .18s, color .18s, border .18s;
       box-sizing: border-box;
+      display: inline-block;
     }
-    .main-action:hover, .main-action:focus {
+
+    button.main-action:hover, .main-action:hover,
+    button.main-action:focus, .main-action:focus {
       background: #228be6;
       color: #fff;
       border-color: #228be6;
