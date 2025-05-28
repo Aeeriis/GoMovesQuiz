@@ -1503,11 +1503,12 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
         if (!xpState.fruitBag[state.fruit.emoji]) xpState.fruitBag[state.fruit.emoji] = 0;
         xpState.fruitBag[state.fruit.emoji]++;
         xpState.discoveredFruits[state.fruit.emoji] = true;
-        saveXP && saveXP();
-        showXP && showXP();
-        typeof renderFruitEncyclopedia === "function" && renderFruitEncyclopedia();
+        if (typeof saveXP === "function") saveXP();
+        if (typeof showXP === "function") showXP();
+        if (typeof renderFruitEncyclopedia === "function") renderFruitEncyclopedia();
         saveDailyChallenge();
-        renderDailyChallenge(); // Immediately show completion UI with share
+        // Show reward UI immediately
+        renderDailyChallenge();
         return;
       }
       saveDailyChallenge();
