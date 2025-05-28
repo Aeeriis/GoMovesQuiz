@@ -1279,12 +1279,11 @@
     }
 // --- Daily Challenge: 10 Questions, Retry on Failure ---
 // --- 24h Rolling Timer Helpers ---
-// --- 24h Rolling Timer Helpers ---
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 // Helper: get lock state for the daily challenge (returns {locked, msLeft})
 function getDailyChallengeLockState() {
-  // Only lock if fruit was claimed
+  // Only lock if fruit was claimed (challenge passed)
   let now = Date.now();
   let last = dailyChallengeState.lastTimestamp || 0;
   let msLeft = (last + ONE_DAY_MS) - now;
@@ -1391,20 +1390,11 @@ function generateNewChallenge() {
   return dailyChallengeState;
 }
 
-// --- Retrieve or create challenge (only if not locked and not claimed) ---
-function getOrCreateChallenge() {
-  let lock = getDailyChallengeLockState();
-  // If locked, do not create a new challenge:
-  if (lock.locked) return dailyChallengeState;
-  // If not locked, always create a fresh one (so they can retry after failure)
-  return generateNewChallenge();
-}
-
 // --- UI: Render daily challenge, with 24h cooldown logic ---
 function renderDailyChallenge() {
   let body = document.getElementById('dailyChallengeBody');
   let lock = getDailyChallengeLockState();
-  let state = getOrCreateChallenge();
+  let state = dailyChallengeState; // always use current state
 
   // --- If challenge is locked, show countdown ---
   if (lock.locked) {
@@ -1508,7 +1498,7 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
       if (state.progress === 10) {
         state.completed = true;
         state.fruitClaimed = true;
-        state.lastTimestamp = Date.now(); // LOCK ONLY ON PASS!
+        state.lastTimestamp = Date.now();
         // Award fruit
         if (!xpState.fruitBag[state.fruit.emoji]) xpState.fruitBag[state.fruit.emoji] = 0;
         xpState.fruitBag[state.fruit.emoji]++;
@@ -1531,8 +1521,13 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
   };
 }
 
-// --- UI handlers ---
+// --- Modal open handler ---
 document.getElementById('openDailyChallenge').onclick = function() {
+  let lock = getDailyChallengeLockState();
+  // Only create a new challenge if not locked and either no challenge, failed, or passed (and cooldown expired)
+  if (!lock.locked && (!dailyChallengeState.questions || dailyChallengeState.failed || dailyChallengeState.fruitClaimed)) {
+    generateNewChallenge();
+  }
   renderDailyChallenge();
   document.getElementById('dailyChallengeModal').style.display = "flex";
 };
