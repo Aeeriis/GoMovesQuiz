@@ -1278,20 +1278,25 @@
       return `Traded up to <span style="font-size:1.2em">${newFruit.emoji}</span> <b>${newFruit.name}</b>!`;
     }
 // --- Daily Challenge: 10 Questions, Retry on Failure ---
-// --- 24h Rolling Timer Helpers ---
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-// Helper: get lock state for the daily challenge (returns {locked, msLeft})
+// --- SESSION FLAG ---
+let justCompletedDailyChallenge = false;
+
+// --- State load/save ---
+let dailyChallengeState = JSON.parse(localStorage.getItem('dailyChallenge') || '{}');
+function saveDailyChallenge() {
+  localStorage.setItem('dailyChallenge', JSON.stringify(dailyChallengeState));
+}
+
+// --- Helpers ---
 function getDailyChallengeLockState() {
-  // Only lock if fruit was claimed (challenge passed)
   let now = Date.now();
   let last = dailyChallengeState.lastTimestamp || 0;
   let msLeft = (last + ONE_DAY_MS) - now;
   let locked = dailyChallengeState.fruitClaimed && msLeft > 0;
   return { locked, msLeft };
 }
-
-// Helper: format ms into "Xh Ym Zs"
 function formatCountdown(ms) {
   let s = Math.floor(ms / 1000);
   let h = Math.floor(s / 3600);
@@ -1300,15 +1305,8 @@ function formatCountdown(ms) {
   return `${h}h ${m}m ${sec}s`;
 }
 
-// --- Daily Challenge State ---
-let dailyChallengeState = JSON.parse(localStorage.getItem('dailyChallenge') || '{}');
-function saveDailyChallenge() {
-  localStorage.setItem('dailyChallenge', JSON.stringify(dailyChallengeState));
-}
-
-// --- Generate a single challenge question (reuses your logic) ---
+// --- Challenge generation (your logic, unchanged) ---
 function generateChallengeQuestion() {
-  // Use onlyHighScore = true just for daily challenge generation
   let eligible = pokedex.filter(poke => {
     let name = poke.speciesName;
     let fastList, chargeList;
@@ -1319,7 +1317,6 @@ function generateChallengeQuestion() {
       fastList = (poke.fastMoves || []).filter(mv => !!movesByName[mv]);
       chargeList = (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
     }
-    // ONLY include if score > 80 and in metaPokes
     return fastList.length && chargeList.length && metaPokes.includes(name);
   });
   if (!eligible.length) return null;
@@ -1333,7 +1330,7 @@ function generateChallengeQuestion() {
     : (pokemon.chargedMoves || []).filter(mv => !!movesByName[mv]);
   let fast = movesByName[fastList[Math.floor(Math.random() * fastList.length)]];
   let charge = movesByName[chargeList[Math.floor(Math.random() * chargeList.length)]];
-  let which = 1 + Math.floor(Math.random() * 4); // multi-charge: random 1st, 2nd, 3rd, or 4th
+  let which = 1 + Math.floor(Math.random() * 4);
   let nthText = getOrdinalText(which);
   let needed = calcFastMovesForNthCharge(fast.Energy, charge.Energy, which);
   return {
@@ -1349,10 +1346,7 @@ function generateChallengeQuestion() {
     nthText
   };
 }
-
-// --- Pick a reward fruit (Uncommon+) ---
 function getDailyChallengeFruit() {
-  // Custom rarity drop rates
   const rarityTable = [
     { rarity: "Uncommon", prob: 45 },
     { rarity: "Rare",     prob: 35 },
@@ -1367,8 +1361,6 @@ function getDailyChallengeFruit() {
   const pool = LEVELUP_REWARDS.filter(f => f.rarityKey === chosenRarity);
   return pool[Math.floor(Math.random() * pool.length)];
 }
-
-// --- Generate a challenge state for this attempt (10 questions, new reward) ---
 function generateNewChallenge() {
   let questions = [];
   for (let i = 0; i < 10; ++i) {
@@ -1384,19 +1376,56 @@ function generateNewChallenge() {
     completed: false,
     fruit,
     fruitClaimed: false,
-    lastTimestamp: dailyChallengeState.lastTimestamp || 0 // keep lastTimestamp if present
+    lastTimestamp: dailyChallengeState.lastTimestamp || 0
   };
   saveDailyChallenge();
   return dailyChallengeState;
 }
 
-// --- UI: Render daily challenge, with 24h cooldown logic ---
+// --- Main render ---
 function renderDailyChallenge() {
   let body = document.getElementById('dailyChallengeBody');
   let lock = getDailyChallengeLockState();
-  let state = dailyChallengeState; // always use current state
+  let state = dailyChallengeState;
 
-  // --- If challenge is locked, show countdown ---
+  // --- Show congrats/share if just completed (even if locked) ---
+  if (state.fruitClaimed && (justCompletedDailyChallenge || !lock.locked)) {
+    const shareMsg = `I completed today's Pokémon Go Moveset Energy Quiz Daily Challenge and got a ${state.fruit.emoji} ${state.fruit.name}! 🍀
+Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
+`;
+    body.innerHTML =
+      `🎉 <b>Complete!</b><br><br>
+      You earned: <span style="font-size:2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b><br>
+      <button id="dailyChallengeShareBtn" style="margin-top:1em;">Share</button>
+      <div id="dailyChallengeShareMsg" style="color:#228be6;font-size:1em;margin-top:0.5em;"></div>
+      <br>Come back in 24 hours for a new challenge!`;
+
+    const btn = document.getElementById('dailyChallengeShareBtn');
+    const msgDiv = document.getElementById('dailyChallengeShareMsg');
+    if (btn) {
+      btn.onclick = async function () {
+        if (navigator.share) {
+          try {
+            await navigator.share({ text: shareMsg });
+            msgDiv.textContent = "Shared!";
+          } catch (e) {
+            msgDiv.textContent = "Share cancelled.";
+          }
+        } else {
+          try {
+            await navigator.clipboard.writeText(shareMsg);
+            msgDiv.textContent = "Copied to clipboard!";
+          } catch {
+            msgDiv.textContent = "Failed to copy!";
+          }
+        }
+        setTimeout(() => { msgDiv.textContent = ""; }, 2000);
+      }
+    }
+    return;
+  }
+
+  // --- If locked, show countdown ---
   if (lock.locked) {
     body.innerHTML =
       `⏳ <b>Come back in:</b><br><br>
@@ -1413,45 +1442,6 @@ function renderDailyChallenge() {
     }
     updateTimer();
     document.getElementById('dailyChallengeForceCheckBtn').onclick = renderDailyChallenge;
-    return;
-  }
-
-  // --- If fruit was claimed, show win screen and share ---
-  if (state.fruitClaimed) {
-    const shareMsg = `I completed today's Pokémon Go Moveset Energy Quiz Daily Challenge and got a ${state.fruit.emoji} ${state.fruit.name}! 🍀
-Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
-`;
-    body.innerHTML =
-      `🎉 <b>Complete!</b><br><br>
-      You earned: <span style="font-size:2em">${state.fruit.emoji}</span> <b>${state.fruit.name}</b><br>
-      <button id="dailyChallengeShareBtn" style="margin-top:1em;">Share</button>
-      <div id="dailyChallengeShareMsg" style="color:#228be6;font-size:1em;margin-top:0.5em;"></div>
-      <br>Come back in 24 hours for a new challenge!`;
-
-    // Attach the share button handler immediately after rendering
-    const btn = document.getElementById('dailyChallengeShareBtn');
-    const msgDiv = document.getElementById('dailyChallengeShareMsg');
-    if (btn) {
-      btn.onclick = async function () {
-        if (navigator.share) {
-          try {
-            await navigator.share({ text: shareMsg });
-            msgDiv.textContent = "Shared!";
-          } catch (e) {
-            msgDiv.textContent = "Share cancelled.";
-          }
-        } else {
-          // Fallback: copy to clipboard
-          try {
-            await navigator.clipboard.writeText(shareMsg);
-            msgDiv.textContent = "Copied to clipboard!";
-          } catch {
-            msgDiv.textContent = "Failed to copy!";
-          }
-        }
-        setTimeout(() => { msgDiv.textContent = ""; }, 2000);
-      }
-    }
     return;
   }
 
@@ -1498,7 +1488,7 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
         state.completed = true;
         state.fruitClaimed = true;
         state.lastTimestamp = Date.now();
-        // Award fruit
+        justCompletedDailyChallenge = true;
         if (!xpState.fruitBag[state.fruit.emoji]) xpState.fruitBag[state.fruit.emoji] = 0;
         xpState.fruitBag[state.fruit.emoji]++;
         xpState.discoveredFruits[state.fruit.emoji] = true;
@@ -1506,7 +1496,6 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
         if (typeof showXP === "function") showXP();
         if (typeof renderFruitEncyclopedia === "function") renderFruitEncyclopedia();
         saveDailyChallenge();
-        // Show reward UI immediately
         renderDailyChallenge();
         return;
       }
@@ -1524,7 +1513,7 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
 // --- Modal open handler ---
 document.getElementById('openDailyChallenge').onclick = function() {
   let lock = getDailyChallengeLockState();
-  // Only create a new challenge if not locked and either no challenge, failed, or passed (and cooldown expired)
+  justCompletedDailyChallenge = false;
   if (!lock.locked && (!dailyChallengeState.questions || dailyChallengeState.failed || dailyChallengeState.fruitClaimed)) {
     generateNewChallenge();
   }
@@ -1532,10 +1521,14 @@ document.getElementById('openDailyChallenge').onclick = function() {
   document.getElementById('dailyChallengeModal').style.display = "flex";
 };
 document.getElementById('closeDailyChallenge').onclick = function() {
+  justCompletedDailyChallenge = false;
   document.getElementById('dailyChallengeModal').style.display = "none";
 };
 document.getElementById('dailyChallengeModal').onclick = function(e) {
-  if (e.target === this) this.style.display = "none";
+  if (e.target === this) {
+    justCompletedDailyChallenge = false;
+    this.style.display = "none";
+  }
 };
   </script>
 </body>
