@@ -242,6 +242,25 @@
       .disclaimer { font-size: 0.95em; padding: 0.56em 0.7em; }
       .copyright { font-size: 0.78em; }
     }
+    .main-action {
+      font-size: 1.1em;
+      padding: 0.6em 1.2em;
+      margin: 0.5em 0;
+      border-radius: 6px;
+      background: #fff;
+      color: #228be6;
+      border: 2px solid #228be6;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background .18s, color .18s, border .18s;
+      box-sizing: border-box;
+    }
+    .main-action:hover, .main-action:focus {
+      background: #228be6;
+      color: #fff;
+      border-color: #228be6;
+      outline: none;
+    }
   </style>
 </head>
 <body>
@@ -250,11 +269,11 @@
       <b>Disclaimer:</b> This entire app was created by AI (GitHub Copilot). All gameplay and meta data used here are from <a href="https://pvpoke.com" target="_blank" rel="noopener">pvpoke.com</a>.
     </div>
     <h1>Pokémon Go Moveset Energy Quiz</h1>
-    <button id="openTradeupMenu" style="margin:0.5em 0;">Fruit Trade Up</button>
-    <button id="openFruitEncyclopedia" style="margin:0.5em 0;">Fruit Encyclopedia</button>
+    <button id="openTradeupMenu" main-action>Fruit Trade Up</button>
+    <button id="openFruitEncyclopedia" main-action>Fruit Encyclopedia</button>
     <!-- Add this in your HTML, e.g. below the Fruit Encyclopedia button: -->
-    <button id="openDailyChallenge" style="margin:0.5em 0;">Daily Challenge 🍀</button>
-    <button id="openFeedback" style="margin:0.5em 0;">Feedback</button>
+    <button id="openDailyChallenge" class="main-action">Daily Challenge 🍀</button>
+    <button id="openFeedback" class="main-action">Feedback</button>
 
     <!-- Daily Challenge Modal -->
     <div id="dailyChallengeModal" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; 
@@ -273,9 +292,9 @@
       <div style="background:#fff; border-radius:10px; max-width:430px; margin:auto; padding:1.2em; box-shadow:0 8px 32px #0004; position:relative;">
         <button id="closeFeedbackModal" style="position:absolute; right:0.7em; top:0.7em; font-size:1.4em; background:none; border:none; color:#666; cursor:pointer;">×</button>
         <div style="font-size:1.3em; font-weight:bold; text-align:center; margin-bottom:0.6em;">Feedback</div>
-        <form action="https://formspree.io/f/meogyrvw" method="POST">
-          <textarea name="feedback" required></textarea>
-          <button type="submit">Send Feedback</button>
+        <form action="https://formspree.io/f/meogyrvw" method="POST" style="display:flex;flex-direction:column;gap:0.5em;">
+          <textarea name="feedback" required style="width:100%;font-size:1.1em;"></textarea>
+          <button type="submit" class="main-action" style="width:100%;margin-top:0.5em;">Send Feedback</button>
         </form>
         <div id="feedbackThanks" style="display:none; color:green; text-align:center; margin-top:0.7em;">Thank you for your feedback!</div>
       </div>
