@@ -273,9 +273,9 @@
       <div style="background:#fff; border-radius:10px; max-width:430px; margin:auto; padding:1.2em; box-shadow:0 8px 32px #0004; position:relative;">
         <button id="closeFeedbackModal" style="position:absolute; right:0.7em; top:0.7em; font-size:1.4em; background:none; border:none; color:#666; cursor:pointer;">×</button>
         <div style="font-size:1.3em; font-weight:bold; text-align:center; margin-bottom:0.6em;">Feedback</div>
-        <form id="feedbackForm" style="display:flex; flex-direction:column; gap:0.7em;">
-          <textarea id="feedbackText" rows="5" style="width:100%;font-size:1.1em;" placeholder="Your feedback..."></textarea>
-          <button type="submit" style="font-size:1.1em;">Send Feedback</button>
+        <form action="https://formspree.io/f/meogyrvw" method="POST">
+          <textarea name="feedback" required></textarea>
+          <button type="submit">Send Feedback</button>
         </form>
         <div id="feedbackThanks" style="display:none; color:green; text-align:center; margin-top:0.7em;">Thank you for your feedback!</div>
       </div>
