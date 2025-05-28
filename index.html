@@ -1373,7 +1373,7 @@ function generateNewChallengeForToday() {
     failed: false,
     completed: false,
     fruit,
-    fruitClaimed: dailyChallengeState.fruitClaimed || false // persist fruitClaimed flag for the day
+    fruitClaimed: false // persist fruitClaimed flag for the day
   };
   saveDailyChallenge();
   return dailyChallengeState;
