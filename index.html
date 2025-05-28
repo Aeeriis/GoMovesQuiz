@@ -1284,7 +1284,9 @@ function getTodayStr() {
   return `${d.getFullYear()}-${m<10?'0':''}${m}-${day<10?'0':''}${day}`;
 }
 
-let dailyChallengeState = JSON.parse(localStorage.getItem('dailyChallenge') || '{}');
+function loadDailyChallenge() {
+  return JSON.parse(localStorage.getItem('dailyChallenge') || '{}');
+}
 function saveDailyChallenge() {
   localStorage.setItem('dailyChallenge', JSON.stringify(dailyChallengeState));
 }
@@ -1382,6 +1384,13 @@ function generateNewChallengeForToday() {
 // On opening, initialize today's challenge if needed, or reuse
 function getOrCreateTodayChallenge10() {
   let today = getTodayStr();
+  // Always reload from storage to ensure state is up to date
+  dailyChallengeState = loadDailyChallenge();
+  if (dailyChallengeState.date !== today || !dailyChallengeState.questions || dailyChallengeState.questions.length !== 10) {
+    return generateNewChallengeForToday();
+  }
+  return dailyChallengeState;
+}
   if (dailyChallengeState.date !== today || !dailyChallengeState.questions || dailyChallengeState.questions.length !== 10) {
     return generateNewChallengeForToday();
   }
