@@ -1428,30 +1428,31 @@ Try it yourself: https://aeeriis.github.io/GoMovesQuiz/
       <div id="dailyChallengeShareMsg" style="color:#228be6;font-size:1em;margin-top:0.5em;"></div>
       <br>Come back in 24 hours for a new challenge!`;
 
-    // Attach the share button handler immediately after rendering
-    const btn = document.getElementById('dailyChallengeShareBtn');
-    const msgDiv = document.getElementById('dailyChallengeShareMsg');
-    if (btn) {
-      btn.onclick = async function () {
-        if (navigator.share) {
-          try {
-            await navigator.share({ text: shareMsg });
-            msgDiv.textContent = "Shared!";
-          } catch (e) {
-            msgDiv.textContent = "Share cancelled.";
+    setTimeout(() => {
+      const btn = document.getElementById('dailyChallengeShareBtn');
+      const msgDiv = document.getElementById('dailyChallengeShareMsg');
+      if (btn) {
+        btn.onclick = async function () {
+          if (navigator.share) {
+            try {
+              await navigator.share({ text: shareMsg });
+              msgDiv.textContent = "Shared!";
+            } catch (e) {
+              msgDiv.textContent = "Share cancelled.";
+            }
+          } else {
+            // Fallback: copy to clipboard
+            try {
+              await navigator.clipboard.writeText(shareMsg);
+              msgDiv.textContent = "Copied to clipboard!";
+            } catch {
+              msgDiv.textContent = "Failed to copy!";
+            }
           }
-        } else {
-          // Fallback: copy to clipboard
-          try {
-            await navigator.clipboard.writeText(shareMsg);
-            msgDiv.textContent = "Copied to clipboard!";
-          } catch {
-            msgDiv.textContent = "Failed to copy!";
-          }
+          setTimeout(() => { msgDiv.textContent = ""; }, 2000);
         }
-        setTimeout(() => { msgDiv.textContent = ""; }, 2000);
       }
-    }
+    }, 0);
     return;
   }
 
@@ -1537,5 +1538,6 @@ document.getElementById('closeDailyChallenge').onclick = function() {
 document.getElementById('dailyChallengeModal').onclick = function(e) {
   if (e.target === this) this.style.display = "none";
 };
+  </script>
 </body>
 </html>
