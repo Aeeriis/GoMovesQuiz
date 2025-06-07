@@ -31,7 +31,7 @@
     h1 { font-size: 1.6em; }
     .quiz-section { margin-top: 2em; }
     .result { margin-top: 1em; font-weight: bold; }
-    input[type="number"] { width: 90%; font-size: 1.2em; }
+    input[type="number"] { width: %; font-size: 1.2em; }
     button { font-size: 1.1em; padding: 0.6em 1.2em; margin-top: 1em;}
     label { font-size: 1.1em; }
     #question { font-size: 1.15em; margin-bottom: 1em; }
@@ -617,7 +617,7 @@
             const row = rowstr.split(",");
             const name = row[idxName];
             const score = parseFloat(row[idxScore]);
-            if (!onlyHighScore || score > 90) {
+            if (!onlyHighScore || score > 92) {
               metaPokes.push(name);
             }
             if (idxFM !== -1 && idxC1 !== -1 && idxC2 !== -1) {
