@@ -617,7 +617,7 @@
             const row = rowstr.split(",");
             const name = row[idxName];
             const score = parseFloat(row[idxScore]);
-            if (!onlyHighScore || score == 93.3) {
+            if (!onlyHighScore || score > 80) {
               metaPokes.push(name);
             }
             if (idxFM !== -1 && idxC1 !== -1 && idxC2 !== -1) {
@@ -859,14 +859,13 @@
     function getPreferredOrAllChargeMoves(poke) {
       let name = poke.speciesName;
       if (onlyPreferredMoveset && metaPreferred[name]) {
-    // metaPreferred[name] is now an array of objects
-        let movesets = Array.isArray(metaPreferred[name]) ? metaPreferred[name] : [metaPreferred[name]];
-    // Collect all charge moves from all preferred movesets, flatten, deduplicate, filter for validity
-        let allMoves = movesets.flatMap(set => [set.charge1, set.charge2]);
-        return [...new Set(allMoves)].filter(mv => !!movesByName[mv]);
+        let c1 = metaPreferred[name].charge1;
+        let c2 = metaPreferred[name].charge2;
+        return [c1, c2].filter((mv, i, arr) => mv && arr.indexOf(mv) === i && !!movesByName[mv]);
       }
-  return (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
-}
+      return (poke.chargedMoves || []).filter(mv => !!movesByName[mv]);
+    }
+
 
     function calcFastMovesForNthCharge(fastEnergy, chargeEnergy, n) {
       let energy = 0;
