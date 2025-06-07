@@ -617,7 +617,7 @@
             const row = rowstr.split(",");
             const name = row[idxName];
             const score = parseFloat(row[idxScore]);
-            if (!onlyHighScore || score > 80) {
+            if (!onlyHighScore || score == 93.3) {
               metaPokes.push(name);
             }
             if (idxFM !== -1 && idxC1 !== -1 && idxC2 !== -1) {
