@@ -34045,7 +34045,7 @@
         "hp": 181
     },
     "types": ["bug", "water"],
-    "fastMoves": ["FURY_CUTTER", "METAL_CLAW", "WATERFALL", "SHADOW_CLAW"],
+    "fastMoves": ["FURY_CUTTER", "METAL_CLAW", "WATERFALL"],
     "chargedMoves": ["X_SCISSOR", "AQUA_JET", "AERIAL_ACE", "LIQUIDATION", "RAZOR_SHELL"],
     "defaultIVs": {
         "cp500": [6, 8, 15, 10],
